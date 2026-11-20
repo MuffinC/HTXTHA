@@ -1,0 +1,12 @@
+# Conda environment for local development (the author uses Anaconda on Windows).
+# Python packages come from requirements-dev.txt so there is one source of truth.
+#   conda env create -f backend/environment.yml   (run from the repo root)
+#   conda activate htx-doc-analyst
+name: htx-doc-analyst
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -r requirements-dev.txt
