@@ -16,6 +16,7 @@ from fastapi import FastAPI
 
 from app import __version__
 from app.api import health
+from app.api.errors import register_error_handlers
 from app.config import Settings, get_settings
 from app.logging_config import configure_logging
 
@@ -66,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Every request in this app instance sees the settings it was built with.
     app.dependency_overrides[get_settings] = lambda: settings
 
+    register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     return app
 

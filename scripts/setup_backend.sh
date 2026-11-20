@@ -32,4 +32,8 @@ fi
 
 echo
 echo "Done. Activate with: source backend/.venv/bin/activate (or backend/.venv/Scripts/activate on Git Bash)"
+echo "Windows PowerShell users: if activation is blocked, first run (this session only):"
+echo "  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass"
 echo "Run the API (mock mode): cd backend && LLM_PROVIDER=mock DATA_DIR=./data uvicorn app.main:app --reload"
+echo "Then open http://127.0.0.1:8000/api/health (use 127.0.0.1, not localhost: localhost may resolve to IPv6, which uvicorn does not listen on)."
+echo "API docs: http://127.0.0.1:8000/api/docs"

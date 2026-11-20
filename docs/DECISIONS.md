@@ -111,10 +111,162 @@ Format: **Decision**, *Context*, **Alternatives**, **Why**, **Milestone**.
   `Dockerfile` and `*.conf`.
 - **Milestone:** M0
 
+## D-012 Accept PyMuPDF despite its AGPL-3.0 licence
+
+- **Context:** PyMuPDF (and the MuPDF library under it) is dual-licensed: AGPL-3.0, or a
+  commercial licence from Artifex. AGPL is a strong copyleft licence. Anyone who distributes the
+  software, *or lets users interact with it over a network*, must make the complete
+  corresponding source of the combined application available under AGPL.
+- **Why we accept it here:** one library covers every PDF need in the pipeline: the text layer,
+  table detection (`find_tables`), image and vector-drawing inspection, encryption and
+  active-content checks, page rendering to PNG, and generating test fixtures. Fewer
+  dependencies means a smaller attack surface, a single parsing model (the same parser validates
+  and extracts, so they cannot disagree about a file), and less code. This repository is public
+  and open source, so the AGPL terms are satisfied for the take-home.
+- **Deployment implication for a government agency:** an internal HTX deployment would either
+  (a) need to keep the full application source available to its users under AGPL, which may
+  conflict with policy on internal or security-sensitive systems, or (b) need a commercial
+  MuPDF licence from Artifex. Legal or procurement review would be needed before production use.
+- **Permissive alternative:** **pypdfium2** (Apache-2.0 / BSD-3, built on Google's PDFium) for
+  opening, encryption detection, rendering and the basic text layer, plus **pdfplumber** (MIT)
+  for tables and vector-object (lines, rects, curves) inspection. Cost of switching: two
+  libraries instead of one, slower table extraction, and active-content detection reimplemented
+  over the raw object tree. To keep a swap contained, PyMuPDF is imported only in
+  `app/pipeline/pdf_utils.py`, `app/pipeline/validation.py`, `app/pipeline/extraction.py`,
+  `app/security/pdf_safety.py` and the test fixture builders (`tests/pdf_factory.py`).
+- **Milestone:** M1
+
+## D-013 Render the whole page for visual analysis, not extracted images
+
+- **Context:** visual content in PDFs comes in three forms: embedded raster images (photos,
+  scans), **vector drawings** (most charts and diagrams exported from Excel, matplotlib or
+  PowerPoint), and scanned pages.
+- **Alternatives:** send each extracted embedded image to the vision model.
+- **Why:** image extraction returns nothing for vector charts. The `vector_chart.pdf` sample has
+  12 drawing paths and zero images, and `test_vector_chart_has_no_embedded_images` pins that
+  down. Rendering the page captures all three forms in one model call per page, and keeps the
+  chart's surrounding axis labels, caption and legend, which are text and would be lost from a
+  cropped image.
+- **Trade-off:** a small photo on a page gets fewer pixels than if it were sent alone. Pages
+  are rendered at `RENDER_DPI` (150) with a hard cap of 4 MP (`MAX_RENDER_PIXELS`), computed
+  *before* rendering so a hostile 5000 × 5000 pt page cannot allocate a 100 MP pixmap.
+- **Milestone:** M1 (detection and rendering), M2 (model call)
+
+## D-014 Heuristics for "needs visual analysis"
+
+All thresholds are named constants at the top of `app/pipeline/extraction.py`. Each one is
+covered by a test, and the key ones were mutation-checked: disabling each made a specific test
+fail.
+
+- **Decorative images:** ignored if either pixel dimension is under 100 px, or the visible
+  on-page area is under 2% of the page (spec). Off-page parts of an image are clipped before
+  measuring.
+- **Significant vector drawings:** `Page.get_drawings()` → drop page-sized backgrounds
+  (≥ 90% of page) and **any path touching a detected data table** → cluster nearby paths with
+  `Page.cluster_drawings()` → a cluster counts if it has ≥ 5 path items and ≥ 2% page area.
+  Clustering stops scattered layout lines (header/footer rules, a border box, link
+  underlines) from adding up into a false "chart".
+- **Table rules vs charts:** `find_tables()` reports a table bbox narrower than its drawn grid,
+  so drawings are excluded when they *intersect* the table bbox (plus 8 pt), not when they are
+  contained in it. A ruled table is thus not mistaken for a chart.
+- **Charts mistaken for tables:** `find_tables()` reports a chart on a full grid with data
+  labels as a table once about 19% of its cells contain text. A "table" with fewer than 50% of
+  its cells filled is therefore treated as a grid, not a table, so it is not emitted as
+  markdown and its paths stay eligible as a chart. The test fixture is a scatter chart; a line
+  or bar series breaks up the grid enough that `find_tables` does not misfire.
+- **Likely scanned:** under 50 non-whitespace characters **and** either the largest image
+  covers ≥ 50% of the page, or the page has content that rules (a) and (b) did not explain. The
+  "unexplained" condition was added after a test showed a chart with a short caption also being
+  labelled "scanned", which was the wrong label and inflated its rank to 1.0. Blank pages are
+  never flagged, since sending them would waste a model call.
+- **Cap:** pages that need visual analysis are ranked by visual area ratio (scanned = 1.0;
+  ties go to the earlier page) and the top `MAX_VISUAL_PAGES_PER_DOC` are selected. A
+  `VISUAL_PAGES_CAPPED` warning lists the skipped pages. `needs_visual_analysis` keeps the raw
+  detection result and `selected_for_visual_analysis` holds the selection, so the UI can explain
+  both.
+- **Milestone:** M1
+
+## D-015 Validation order and strictness
+
+- **Order:** size → magic bytes → parse → password → page count → active content → emptiness.
+  Cheapest checks run first, and no PDF parsing happens until the size and header checks pass.
+- **Strict header:** the file must *start* with `%PDF-`. Viewers tolerate junk before the
+  header, but strictness rejects polyglot files (for example a file that is both valid HTML
+  and a valid PDF) at no cost to genuine PDFs.
+- **Extension and MIME type ignored:** a real PDF named `notes.txt` is accepted, and a text
+  file named `.pdf` is rejected (tested).
+- **One parser:** validation and extraction use the same PyMuPDF parser, so a file cannot pass
+  validation under one interpretation and be extracted under another.
+- **`TOO_MANY_FILES` is request-level** (`check_file_count` raises `ApiError`, HTTP 400). It
+  has no single file to attach to. All other codes are per file, so valid files in the same
+  upload still proceed.
+- **Milestone:** M1
+
+## D-016 Active-content detection by scanning object dictionaries
+
+- **Approach:** walk every xref and regex-match `/JS`, `/JavaScript`, `/Launch` and
+  `/EmbeddedFile(s)` in each object's **dictionary** (`xref_object`), plus
+  `embfile_count() > 0`.
+- **Why dictionaries only:** stream bodies (page content) can legitimately contain the bytes
+  "/JS" as text. Keys in dictionaries are where actions actually live.
+- **`/OpenAction` handling:** the spec says "/OpenAction *with script*". A benign OpenAction
+  ("open at page 1, fit width") is not flagged (`goto_open_action_pdf` test), while one pointing
+  to a JavaScript action is caught through `/JS`.
+- **Scope note:** other action types (`/SubmitForm`, `/URI`, `/RichMedia`) are not flagged.
+  They do not execute code on open, and the pipeline never follows them.
+- **Milestone:** M1
+
+## D-017 Prompt-injection scanner: flag, never block; normalise first
+
+- **Flag, don't block:** a flagged document is still analysed as data, with an
+  `INJECTION_SUSPECTED` warning per page. Blocking would let an attacker suppress a legitimate
+  report just by including a trigger phrase, and the analyst should see what the document
+  tried to do.
+- **Normalisation before matching:** NFKC (full-width letters become ASCII), removal of
+  zero-width and bidi characters, whitespace collapsed, lower-cased. Each evasion has a test.
+- **Specific patterns:** phrases like "act as" or "override" are deliberately not patterns,
+  because they are common in incident reports. Negative tests pin down ordinary prose ("the
+  driver ignored the red light").
+- **No echo:** the warning names the matched *categories* (e.g. `ignore_instructions`), never
+  the matched text, because the warning is shown in the UI and the text is attacker-controlled.
+- **Hidden text is scanned:** white or tiny text that a human cannot see is still in the text
+  layer, so it is still scanned (`prompt_injection.pdf` page 2).
+- **Milestone:** M1 (scanner on the text layer). M2 adds scanning of vision transcriptions,
+  since injection can also arrive inside an image.
+
+## D-018 Single source for test fixtures and demo files
+
+- **Why:** `backend/tests/pdf_factory.py` builds every fixture in memory. The pytest tests and
+  `scripts/generate_adversarial_pdfs.py` both use it, so the committed demo files are exactly
+  what the tests exercise. The script also re-validates each file and fails on any mismatch.
+  Builders use fixed metadata, `reproducible=True` and `no_new_id=True`, so output is
+  byte-identical across runs (apart from the encrypted file's random salt).
+- **Milestone:** M1
+
+## D-019 One error envelope for every failure path
+
+- **Why:** the client parses one shape. `ApiError` (application errors), Starlette HTTP errors
+  (404, 405), request validation (422) and unexpected exceptions (500) all render
+  `{"error": {code, message, details}}`.
+- **Leak prevention:** 422 details include the location and reason but not the submitted
+  value (`input`), so document text cannot be echoed back. 500 responses say only "An
+  unexpected error occurred", and the traceback goes to the server log.
+- **Milestone:** M1
+
+## D-020 PII masking scope
+
+- **Patterns:** NRIC/FIN `[STFGM]\d{7}[A-Z]` (case-insensitive), Singapore phone numbers (8
+  digits starting 3/6/8/9, optional `+65`/`65`, optional space or hyphen), and `+`-prefixed
+  international numbers. Lookarounds stop digits inside longer numbers from being partly masked.
+- **Trade-off accepted:** an 8-digit reference number starting with 3, 6, 8 or 9 will be masked.
+  Masking too much is safer than leaking a number.
+- **Where applied:** `mask_pii_in()` runs recursively over structured model output (from M2/M3).
+  Dict keys are untouched because they are schema field names.
+- **Milestone:** M1 (module and tests), wired into outputs in M2/M3
+
 ---
 
 ## Pending decisions (to record when made)
 
 - Final Ollama model tag (verify `qwen3-vl:4b-instruct` exists in M2).
-- Whole-page rendering for visual analysis (M1/M2), as per spec section 6.
 - Triage rubric (M7), as per spec section 8.

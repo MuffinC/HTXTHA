@@ -1,6 +1,8 @@
 # Create a local Python virtual environment for the backend and install
 # runtime + dev dependencies. Windows PowerShell.
 #
+# If script execution is blocked, first allow it for this PowerShell session only:
+#                         Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 # Usage (from anywhere):  .\scripts\setup_backend.ps1
 #   Optional:             .\scripts\setup_backend.ps1 -Python "C:\Path\To\python.exe"
 # Then:                   .\backend\.venv\Scripts\Activate.ps1
@@ -35,5 +37,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
-Write-Host "Done. Activate with: .\backend\.venv\Scripts\Activate.ps1"
+Write-Host "Done."
+Write-Host "Note: if activation is blocked by execution policy, run first (this session only):"
+Write-Host "  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass"
+Write-Host "Activate with: .\backend\.venv\Scripts\Activate.ps1"
 Write-Host 'Run the API (mock mode): cd backend; $env:LLM_PROVIDER="mock"; $env:DATA_DIR="./data"; uvicorn app.main:app --reload'
+Write-Host "Then open http://127.0.0.1:8000/api/health (use 127.0.0.1, not localhost: localhost may resolve to IPv6, which uvicorn does not listen on)."
+Write-Host "API docs: http://127.0.0.1:8000/api/docs"
