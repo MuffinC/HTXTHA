@@ -132,6 +132,14 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   need authentication, which is out of scope (A-001).
 - A-305: `NGINX_CLIENT_MAX_BODY_SIZE` (default `260m`) must stay at least
   `MAX_FILES x MAX_FILE_MB` plus about 1 MB. Raise it together with those two limits.
+- A-306: For the GPU stack, give Docker Desktop's VM **at least 12 GB of memory** (Settings >
+  Resources on Hyper-V; `.wslconfig` `memory=` on the WSL 2 backend), or use native Ollama for
+  long runs. On the author's machine the VM had about 8.3 GB. During M6's repeated live
+  scorecard runs, Docker Desktop's engine stopped answering twice (API calls returned HTTP 500,
+  and the Ollama container disappeared mid-job), once while an image build ran alongside and
+  once with only the Ollama container running. A `docker desktop restart` recovered it each
+  time. This is consistent with memory pressure in the VM while the model is loaded, but it was
+  not proven. The final M6 measurements were run against native Ollama (DECISIONS D-060).
 
 ## Known limitations
 
@@ -164,14 +172,13 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   miscount objects. All visual output is labelled AI-generated and is meant to be checked
   against the page (page previews arrive in M8). A larger model would likely do better
   (untested).
-- L-007: Consolidated-report quality with the 4B model, measured by the live contradiction
-  scorecard over 6–7 runs (DECISIONS D-042). It reliably finds the time and weather
-  contradictions, finds the vehicle count about half the time, and almost never finds the
-  traffic-light colour (1 of 14 runs). It sometimes calls the two reports separate
-  incidents and sometimes lists a contradiction where one document is simply silent. Results
-  vary from run to run. Marker entities and date arithmetic were fixed deterministically or
-  by prompt (D-043, D-044). The incident profile (M6) is measured against this baseline.
-  Until then, the consolidated report is a starting point for the analyst, not a finding.
+- L-007: Consolidated-report quality. **Under the general profile** the 4B model's own
+  comparison is unstable (DECISIONS D-042): the traffic light was found in 1 of 14 runs, there
+  were occasional absence contradictions, and results varied from run to run. **Under the
+  incident profile** the comparisons are made by rule, and the scorecard was perfect in 5 of 5
+  runs (D-060). The overall summary is still written by the model, and can contradict the rule
+  findings shown beside it (in one real-model run it called one incident reported three times
+  "three incidents"). The analyst should trust the rule-based sections over the summary prose.
 - L-008: Jobs run one at a time from an in-memory queue. A large upload delays everything
   queued behind it, and a restart loses queued work (A-117). Acceptable for one analyst; a
   multi-user deployment would need a persistent queue.
@@ -194,3 +201,6 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - L-014: The mock provider's incident extraction is keyword matching tuned to the sample ticket
   layout. It demonstrates the UI and rules on the sample tickets but extracts little from
   arbitrary documents.
+- L-015: The general analysis can list a PII placeholder as an entity (for example a masked
+  contact number appearing as "phone redacted" under People). The masking itself works; the
+  placeholder is cosmetic noise in the entity list.

@@ -1016,7 +1016,8 @@ All tunable values are named constants at the top of `incident_rules.py`.
     unknown. Shown separately and never compared.
   - Each group carries the rule evidence as its reason.
 - **Contradictions and agreements:** only within a same-incident group, and **only between
-  reports that state a value**, so absence never creates a contradiction. One entry per field
+  reports that state a value**, so absence never creates a contradiction. Lighting is compared coarsely (daylight, dusk or dawn, night), so "street lights on"
+  against "dark" is not a contradiction (D-060). One entry per field
   lists every report's value and quote with a page chip. Agreements: every report that states
   the field gives the same value.
 - **Narrative vs photo:**
@@ -1063,6 +1064,84 @@ All tunable values are named constants at the top of `incident_rules.py`.
   narrative-against-photo checks therefore demonstrate realistically in mock mode: on the four
   tickets it finds all 6 planted contradictions and both T4 inconsistencies, with 0 false
   positives.
+- **Milestone:** M6
+
+## D-060 M6 scorecard results, and extraction robustness
+
+- **Setup:** 5 repetitions against **native** Ollama 0.40.16 (`qwen3-vl:4b-instruct`, flash
+  attention with the q8_0 KV cache, 16k context, RTX 3070). Each repetition ran
+  `pytest -m ollama -k "ticket_scorecard or (contradiction_scorecard and incident)"`, about
+  2 minutes. Earlier attempts on Docker's Ollama were cut short when Docker Desktop crashed
+  (A-306).
+
+  **M3 measure** (the original synthetic pair; four planted contradictions, D-042):
+
+  | Measure | M3 baseline, general profile (7 runs) | **M6, incident profile (5 runs)** |
+  |---|---|---|
+  | Planted contradictions found (mean, of 4) | 2.7 (runs: 4, 3, 3, 2, 2, 2, 3) | **4.0** (4, 4, 4, 4, 4) |
+  | Traffic light found | 1/7 | **5/5** |
+  | Vehicle count found | 4/7 | **5/5** |
+  | Time / weather found | 7/7 / 7/7 | 5/5 / 5/5 |
+  | False contradictions per run (mean) | 0.9 | **0** |
+  | Runs with an "absence" contradiction | 2/7 | **0/5** |
+  | Pair grouped as one incident | 6/7 | **5/5** |
+  | Report calls them separate incidents | 2/7 | 0/5 |
+
+  The unplanted but genuine injury contradiction ("nobody appeared to be hurt" against "holding
+  his arm") was also found in 5/5 runs.
+
+  **Ticket scorecard** (four e-report tickets, D-059):
+
+  | Measure | Result (5 runs) |
+  |---|---|
+  | Field extraction against `ticket_factory` expected values | **20/20 in every run** |
+  | Planted contradictions (time, traffic light, vehicles, weather, injuries, left the scene) | **6/6 in every run** |
+  | False contradictions | **0 in every run** |
+  | Absence check (T3 never a traffic-light position) | passed 5/5 |
+  | T4 narrative against photo (weather, lighting) | **2/2 in every run** |
+  | Grouping (T1–T3 same incident, T4 separate, no possibly-related pairs) | correct 5/5 |
+  | Time for 4 tickets (incl. 1 photo) | 77–90 s |
+
+- **M6 acceptance (set in D-042), met:** mean 4.0 of 4 against the 2.7 baseline, the traffic
+  light found in every run, no absence contradiction, and the pair grouped as one incident in
+  every run.
+- **How it got there, as code rules rather than prompt tuning:**
+  1. Quote grounding (D-058) removed two false contradictions: lighting inferred from a time,
+     and road surface taken from a weather quote.
+  2. Lighting is compared coarsely across reports (D-058). "Street lights on" and "dark" are
+     both night, which removed a false lighting contradiction in the M3 pair.
+  3. Extraction-schema bounds (below).
+- **The open 0/4 run, root cause and fix:**
+  - **Observed:** one live run scored the M3 pair 0/4 contradictions with 0 false ones. Three
+    reruns and six diagnostic runs, with each document's derived date, time, location, category
+    and submission time printed, always grouped correctly. So the grouping rules were not at
+    fault.
+  - **Found by capturing the raw extraction outputs:** report B's extraction came back as
+    invalid JSON in one call, an unterminated string at about 9,860 characters (a normal
+    extraction is about 2,500). That is a repetition loop inside a string, running to the
+    2,048-token cap. The retry usually rescues it. If the retry loops too, the report gets
+    `INCIDENT_EXTRACTION_FAILED` and drops out of the rules: no group, no contradictions and
+    no false ones, which is exactly the 0/4 signature.
+  - **Fix (structural):** Ollama enforces JSON-schema `maxLength` and `maxItems` while decoding
+    (verified: a 40-character limit and a 3-item limit were both honoured). Every free-text
+    field and list in `IncidentExtractionOutput` is now bounded: quotes 200 characters, header
+    fields 80, the summary 800, claims 300, and at most 8 claims, gaps or parties. A loop is cut
+    off at the bound and the JSON still closes.
+  - **Also fixed:** placeholder strings such as "not_mentioned" in the header fields are now
+    treated as null. The model wrote `occurred_time: "not_mentioned"` in every run, which made
+    the derived time's source read "from 'not_mentioned'".
+  - **Made visible:** a report whose extraction failed is named in a consolidated
+    `INCIDENT_EXTRACTION_FAILED` warning, so zero contradictions can no longer look like
+    agreement. The M3 scorecard now prints extraction failures and possibly-related pairs.
+  - **Tests:** schema bounds, placeholder handling and the exclusion warning, each confirmed to
+    fail when its fix is removed.
+- **Real-model screenshots** (`docs/images/m6-real-*.png`, 86 s for the four tickets): the rule
+  findings are correct. Two model-written blemishes remain:
+  - the overall summary calls the three reports "three incidents", although the same-incident
+    group below shows one;
+  - the masked contact number appears as a person entity in the general analysis.
+
+  Both are recorded in L-007 and L-015.
 - **Milestone:** M6
 
 ## D-061 Incident UI

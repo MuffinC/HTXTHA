@@ -15,9 +15,21 @@ Design (DECISIONS D-057): **the model extracts, code compares.**
   the spec.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
+
+# Length bounds on model-filled fields. Ollama enforces maxLength/maxItems while
+# decoding (verified on 0.40.16), so a repetition loop is cut off at the bound and
+# the JSON still closes, instead of running to the token cap and leaving invalid
+# output. One live run lost a report this way (DECISIONS D-060).
+QUOTE_MAX = 200
+SHORT_MAX = 80
+TEXT_MAX = 300
+SUMMARY_MAX = 800
+LIST_MAX = 8
+
+Quote = Annotated[str, Field(max_length=QUOTE_MAX)]
 
 # --------------------------------------------------------------------------- closed lists
 
@@ -60,7 +72,9 @@ class Stated[T](BaseModel):
 
     value: T
     as_written: str | None = Field(
-        default=None, description="The reporter's exact words, or null if not mentioned"
+        default=None,
+        max_length=QUOTE_MAX,
+        description="The reporter's exact words, or null if not mentioned",
     )
     page: int | None = Field(default=None, description="1-based page of the quote")
 
@@ -105,37 +119,45 @@ class IncidentFacts(BaseModel):
     lighting: LightingFact
     injuries: InjuriesFact
     party_left_scene: LeftSceneFact
-    vehicle_types: list[VehicleType] = Field(default_factory=list)
-    damage_locations: list[DamageLocation] = Field(default_factory=list)
+    vehicle_types: list[VehicleType] = Field(default_factory=list, max_length=LIST_MAX)
+    damage_locations: list[DamageLocation] = Field(default_factory=list, max_length=LIST_MAX)
 
 
 class Party(BaseModel):
     """A person or vehicle involved, by role only (never by name)."""
 
-    role: str
-    description: str
+    role: str = Field(max_length=SHORT_MAX)
+    description: str = Field(max_length=TEXT_MAX)
 
 
 class OtherClaim(BaseModel):
-    claim: str
+    claim: str = Field(max_length=TEXT_MAX)
     page: int
 
 
 class IncidentExtractionOutput(BaseModel):
     """What the extraction model call produces for one incident document."""
 
-    reference_no: str | None
-    submitted_at: str | None = Field(description="Submission date/time, exactly as written")
-    occurred_date: str | None = Field(description="Incident date, exactly as written")
-    occurred_time: str | None = Field(description="Incident time, exactly as written")
-    location: str | None = Field(description="Incident location, exactly as written")
+    reference_no: str | None = Field(max_length=SHORT_MAX)
+    submitted_at: str | None = Field(
+        max_length=SHORT_MAX, description="Submission date/time, exactly as written"
+    )
+    occurred_date: str | None = Field(
+        max_length=SHORT_MAX, description="Incident date, exactly as written"
+    )
+    occurred_time: str | None = Field(
+        max_length=SHORT_MAX, description="Incident time, exactly as written"
+    )
+    location: str | None = Field(
+        max_length=QUOTE_MAX, description="Incident location, exactly as written"
+    )
     category: IncidentCategory
     category_confidence: Confidence
-    narrative_summary: str
-    parties: list[Party]
+    narrative_summary: str = Field(max_length=SUMMARY_MAX)
+    parties: list[Party] = Field(max_length=LIST_MAX)
     facts: IncidentFacts
-    other_claims: list[OtherClaim]
-    missing_information: list[str]
+    other_claims: list[OtherClaim] = Field(max_length=LIST_MAX)
+    missing_information: list[Quote] = Field(max_length=LIST_MAX)
 
 
 # --------------------------------------------------------------------------- API output

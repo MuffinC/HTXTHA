@@ -64,7 +64,7 @@ const fixture: JobResponse = {
           },
           "occurred_at_stated": "14 March 2025 about 9.15pm",
           "location_stated": "Junction of Ang Mo Kio Ave 3 and Ave 8",
-          "narrative_summary": "[MOCK] Public incident report CW-24-1001 14 March 2025, 21:52 Road traffic accident 14 March 2025 about 9.15pm Junction of Ang Mo Kio Ave 3 and Ave 8 Witness (pedestrian) [PHONE REDACTED] None What happened (in the reporter's words) I was waiting to cross at the junction when two cars collided in the middle of the junction.",
+          "narrative_summary": "[MOCK] I was waiting to cross at the junction when two cars collided in the middle of the junction.",
           "parties": [
             {
               "role": "[MOCK] reporter",
@@ -79,7 +79,7 @@ const fixture: JobResponse = {
               "note": "No photo attached."
             },
             {
-              "claim": "Number of vehicles: 2 (“Public incident report CW-24-1001 14 March 2025, 21:52 Road traffic accident 14 March 2025 about 9.15pm Junction of Ang Mo Kio Ave 3 and Ave 8 Witness (pedestri”)",
+              "claim": "Number of vehicles: 2 (“I was waiting to cross at the junction when two cars collided in the middle of the junction.”)",
               "page": 1,
               "corroboration": "not_verifiable",
               "note": "No photo attached."
@@ -121,7 +121,7 @@ const fixture: JobResponse = {
             },
             "vehicle_count": {
               "value": "2",
-              "as_written": "Public incident report CW-24-1001 14 March 2025, 21:52 Road traffic accident 14 March 2025 about 9.15pm Junction of Ang Mo Kio Ave 3 and Ave 8 Witness (pedestri",
+              "as_written": "I was waiting to cross at the junction when two cars collided in the middle of the junction.",
               "page": 1
             },
             "weather": {
@@ -225,7 +225,7 @@ const fixture: JobResponse = {
           },
           "occurred_at_stated": "last night around 21:30",
           "location_stated": "AMK Avenue 3 / Avenue 8 junction",
-          "narrative_summary": "[MOCK] Public incident report CW-24-1002 15 March 2025, 08:05 Road traffic accident last night around 21:30 AMK Avenue 3 / Avenue 8 junction Driver (taxi) [PHONE REDACTED] None What happened (in the reporter's words) I am the taxi driver involved.",
+          "narrative_summary": "[MOCK] I am the taxi driver involved.",
           "parties": [
             {
               "role": "[MOCK] reporter",
@@ -388,7 +388,7 @@ const fixture: JobResponse = {
           },
           "occurred_at_stated": "14 March 2025 at about 9.20pm",
           "location_stated": "Ang Mo Kio Ave 8, junction with Ave 3",
-          "narrative_summary": "[MOCK] Public incident report CW-24-1003 14 March 2025, 23:10 Road traffic accident 14 March 2025 at about 9.20pm Ang Mo Kio Ave 8, junction with Ave 3 Passenger (in the taxi) [PHONE REDACTED] None What happened (in the reporter's words) I was a passenger in the taxi.",
+          "narrative_summary": "[MOCK] I was a passenger in the taxi.",
           "parties": [
             {
               "role": "[MOCK] reporter",
@@ -575,7 +575,7 @@ const fixture: JobResponse = {
           },
           "occurred_at_stated": "17 March 2025 around 11pm",
           "location_stated": "Upper Thomson Road near Lower Peirce Reservoir",
-          "narrative_summary": "[MOCK] Public incident report CW-24-1004 18 March 2025, 09:30 Road traffic accident 17 March 2025 around 11pm Upper Thomson Road near Lower Peirce Reservoir Driver [PHONE REDACTED] Photo 1 (see page 2) What happened (in the reporter's words) My car skidded and hit a roadside tree while I was driving home.",
+          "narrative_summary": "[MOCK] My car skidded and hit a roadside tree while I was driving home.",
           "parties": [
             {
               "role": "[MOCK] reporter",
@@ -760,7 +760,7 @@ const fixture: JobResponse = {
         "topic": "Number of vehicles",
         "positions": [
           {
-            "position": "D1: 2 (“Public incident report CW-24-1001 14 March 2025, 21:52 Road traffic accident 14 March 2025 about 9.15pm Junction of Ang Mo Kio Ave 3 and Ave 8 Witness (pedestri”)",
+            "position": "D1: 2 (“I was waiting to cross at the junction when two cars collided in the middle of the junction.”)",
             "citation": {
               "document_id": "00000000-0000-4000-8000-000000000002",
               "page": 1

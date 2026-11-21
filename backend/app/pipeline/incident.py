@@ -8,6 +8,7 @@ missing information, is computed by ``app.pipeline.incident_rules``.
 """
 
 import logging
+import re
 
 from app.config import Settings
 from app.llm.base import LLMProvider, LLMRequest, LLMTask
@@ -71,6 +72,7 @@ async def extract_incident(
         provider, request, IncidentExtractionOutput, retries=EXTRACTION_RETRIES
     )
     warnings: list[DocumentWarning] = []
+    extraction = _normalise_header(extraction)
     extraction, removed = _clean_pages(extraction, page_count)
     warning = removed_citations_warning(removed, "the incident facts")
     if warning:
@@ -113,6 +115,24 @@ async def extract_incident(
         extra={"stage": "analysing", "event": "incident_extracted", "count": len(checks)},
     )
     return incident, warnings
+
+
+# The model sometimes writes a placeholder such as "not_mentioned" into a free-text
+# header field instead of null (seen in live runs); treat those as missing.
+_PLACEHOLDER = re.compile(
+    r"^\W*(?:not[ _]?(?:mentioned|stated|given)|n/?a|none|null|unknown|-)\W*$", re.I
+)
+_HEADER_FIELDS = ("reference_no", "submitted_at", "occurred_date", "occurred_time", "location")
+
+
+def _normalise_header(extraction: IncidentExtractionOutput) -> IncidentExtractionOutput:
+    """Replace placeholder strings in the ticket header fields with None."""
+    updates = {
+        name: None
+        for name in _HEADER_FIELDS
+        if (value := getattr(extraction, name)) is not None and _PLACEHOLDER.match(value)
+    }
+    return extraction.model_copy(update=updates) if updates else extraction
 
 
 def _clean_pages(

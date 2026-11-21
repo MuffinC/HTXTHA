@@ -230,6 +230,10 @@ def _sentences(page_texts: dict[Any, str]) -> list[tuple[int, str]]:
     remaining lines are re-joined first, because PDF text wraps mid-sentence."""
     out: list[tuple[int, str]] = []
     for page, text in page_texts.items():
+        # On the e-report layout, the narrative follows the "What happened" heading.
+        heading = re.search(r"what happened[^\n]*\n", text, re.IGNORECASE)
+        if heading:
+            text = text[heading.end() :]
         prose = " ".join(line for line in text.splitlines() if not _FORM_LINE.match(line.strip()))
         for sentence in re.split(r"(?<=[.!?])\s+", " ".join(prose.split())):
             if len(sentence) >= 20:

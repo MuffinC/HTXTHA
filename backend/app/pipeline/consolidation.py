@@ -134,6 +134,16 @@ async def consolidate(
         warnings.append(warning)
     report.warnings = warnings
     if rule is not None:
+        if rule.excluded:
+            # Zero contradictions must not look like agreement when a report was left out.
+            report.warnings.append(
+                DocumentWarning(
+                    code=WarningCode.INCIDENT_EXTRACTION_FAILED,
+                    message=f"{', '.join(rule.excluded)} could not be compared: their incident "
+                    "facts were not extracted, so they take no part in grouping, contradictions "
+                    "or the timeline.",
+                )
+            )
         report.contradictions = rule.contradictions
         report.agreements = rule.agreements
         report.timeline = rule.timeline
@@ -152,6 +162,8 @@ class IncidentRuleFindings:
     agreements: list[Agreement]
     timeline: list[TimelineEvent]
     findings: str
+    #: Labels of documents whose incident extraction failed (not compared).
+    excluded: list[str]
 
 
 def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRuleFindings:
@@ -212,6 +224,7 @@ def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRu
         agreements=agreements,
         timeline=incident_rules.build_timeline(tickets),
         findings="\n".join(lines),
+        excluded=[label for label, a in by_label.items() if a.incident is None],
     )
 
 

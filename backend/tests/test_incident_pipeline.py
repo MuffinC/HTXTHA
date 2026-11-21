@@ -223,3 +223,54 @@ async def test_consolidation_prompt_carries_rule_findings_without_quotes(
         "common_themes",
         "information_gaps",
     }
+
+
+# --------------------------------------------------------------------------- robustness (D-060)
+
+
+def test_extraction_schema_bounds_every_free_text_field_and_list() -> None:
+    """Ollama enforces maxLength/maxItems while decoding, which stops repetition loops."""
+    from app.schemas.incident import IncidentExtractionOutput
+
+    schema = json.dumps(IncidentExtractionOutput.model_json_schema())
+    props = IncidentExtractionOutput.model_json_schema()["properties"]
+    for name in ("parties", "other_claims", "missing_information"):
+        assert "maxItems" in props[name], name
+    assert '"maxLength": 200' in schema  # quotes
+    assert '"maxLength": 800' in schema  # narrative summary
+
+
+async def test_placeholder_header_values_are_treated_as_missing(settings: Settings) -> None:
+    # Live runs: the model wrote the time into occurred_date and "not_mentioned" into
+    # occurred_time. The time must still be found, with a sensible source.
+    request = await _first_extraction_request(settings)
+    output = json.loads((await RecordingProvider().complete(request)).text)
+    output.update(occurred_date="about 21:15", occurred_time="not_mentioned", location="N/A")
+    provider = RecordingProvider({LLMTask.INCIDENT_EXTRACTION: [json.dumps(output)]})
+
+    analysis = await _analyse_incident(provider, settings)
+
+    incident = analysis.incident
+    assert incident is not None
+    assert incident.location_stated is None
+    assert incident.occurred_at_stated == "about 21:15"
+    assert incident.derived.incident_time is not None
+    assert incident.derived.incident_time.value == "21:15"
+    assert "not_mentioned" not in incident.derived.incident_time.source
+
+
+async def test_report_without_incident_facts_is_named_in_the_consolidated_warnings(
+    settings: Settings,
+) -> None:
+    # The first ticket's extraction fails twice (first try + retry): it must not silently
+    # vanish from the comparison.
+    provider = RecordingProvider({LLMTask.INCIDENT_EXTRACTION: ["{}", "{}"]})
+    async with app_client(create_app(settings, provider=provider)) as client:
+        job = await _run_job(client, [(f"{t.key}.pdf", ticket_pdf(t)) for t in TICKETS])
+
+    report = job["consolidated"]
+    [warning] = [w for w in report["warnings"] if w["code"] == "INCIDENT_EXTRACTION_FAILED"]
+    assert warning["message"].startswith("D1 could not be compared")
+    # The other two reports of the incident are still grouped and compared.
+    [group] = report["related_document_groups"]
+    assert len(group["document_ids"]) == 2

@@ -158,6 +158,16 @@ async def test_contradiction_scorecard(
         e for e in entities if re.search(r"synthetic sample|ai visual description", e, re.I)
     ]
     NOTES.append(f"  pipeline artefacts listed as entities: {artefacts}")
+    # Diagnose a 0/4 run: was a report left out (extraction failed) or not grouped?
+    failed = [
+        d["filename"]
+        for d in job["documents"]
+        if any(w["code"] == "INCIDENT_EXTRACTION_FAILED" for w in d["analysis"]["warnings"])
+    ]
+    NOTES.append(
+        f"  incident extraction failed for: {failed or 'none'}; "
+        f"possibly related pairs: {len(job['consolidated'].get('possibly_related_groups', []))}"
+    )
 
 
 def score_tickets(job: dict[str, Any]) -> list[str]:
