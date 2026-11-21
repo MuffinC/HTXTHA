@@ -20,6 +20,7 @@ class WarningCode(StrEnum):
     VISUAL_ANALYSIS_FAILED = "VISUAL_ANALYSIS_FAILED"  # per page: model error/refusal/timeout
     CITATIONS_REMOVED = "CITATIONS_REMOVED"  # model cited pages/documents that do not exist
     CONTENT_TRUNCATED = "CONTENT_TRUNCATED"  # text cut to fit the model's context window
+    INCIDENT_EXTRACTION_FAILED = "INCIDENT_EXTRACTION_FAILED"  # core analysis kept
 
 
 class Citation(BaseModel):

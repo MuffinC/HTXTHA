@@ -431,3 +431,53 @@ thead th { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
 .drawer-section ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .drawer-section li { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13.5px; }
 .drawer-kind { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; }
+
+/* ---------------------------------------------------------------- incident profile */
+.mono { font-family: var(--font-mono); }
+.rule-tag {
+  display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; color: #2f5b9a; background: var(--info-soft);
+  border: 1px solid #c6d5ec; padding: 0 6px; border-radius: 3px; cursor: help; margin-right: 6px;
+}
+.section-note { font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; flex-wrap: wrap; }
+.subhead { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-top: 6px; }
+
+.ticket-card {
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-sunken);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.ticket-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; margin: 0; }
+.ticket-grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ticket-grid > div.wide { grid-column: span 4; }
+.ticket-grid dt { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.ticket-grid dd { margin: 0; }
+.derived {
+  display: inline-block; margin-left: 6px; font-family: var(--font-mono); font-size: 12px;
+  color: var(--accent); background: var(--accent-soft); padding: 0 6px; border-radius: 3px; cursor: help;
+}
+.ticket-summary { color: var(--text); padding-top: 8px; border-top: 1px solid var(--border); }
+@media (max-width: 1100px) { .ticket-grid { grid-template-columns: 1fr 1fr; } .ticket-grid > div.wide { grid-column: span 2; } }
+
+.facts tbody th { width: 20%; font-weight: 500; }
+.facts td:nth-child(3) { width: 16%; white-space: nowrap; }
+.facts td:nth-child(4) { width: 18%; }
+.facts tr.is-muted th, .facts tr.is-muted td { color: var(--text-faint); }
+.facts q { quotes: '\201C' '\201D'; }
+.facts .status-tag.small { margin-left: 0; }
+
+.checks { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.check { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-left: 3px solid var(--tone); border-radius: var(--radius-sm); }
+.check .status-tag.small { margin-left: 0; flex: none; }
+.check-title { font-weight: 500; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.points.gaps li::before { background: var(--warning); }
+
+.scene-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; margin: 0;
+}
+.scene-grid > div {
+  display: flex; flex-direction: column; padding: 5px 8px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface-sunken);
+}
+.scene-grid dt { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.scene-grid dd { margin: 0; font-size: 13px; }
+.scene-grid > div.is-unclear dd { color: var(--text-faint); font-style: italic; }

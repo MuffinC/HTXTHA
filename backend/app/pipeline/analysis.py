@@ -36,6 +36,7 @@ from app.llm.prompts import load_prompt, render_prompt
 from app.llm.structured import generate_structured
 from app.pipeline.budget import content_budget_tokens, estimate_tokens, truncate_to_tokens
 from app.pipeline.citations import is_valid_page, removed_citations_warning
+from app.pipeline.incident import extract_incident
 from app.pipeline.visual import page_text_with_visuals
 from app.schemas.analysis import (
     ChunkNotes,
@@ -114,6 +115,8 @@ async def analyse_document(
     mock_meta = {
         "page_count": page_count,
         "first_sentences": {p.page: _first_sentence(p.text) for p in extracted.pages},
+        # Full page text, for the mock provider's keyword-based incident extraction.
+        "page_texts": {p.page: p.text for p in extracted.pages},
     }
 
     try:
@@ -122,9 +125,35 @@ async def analyse_document(
         else:
             notes = await _map_notes(pages, page_count, provider, settings, warnings, mock_meta)
             content, description = _notes_content(notes, budget, warnings), _NOTES
-        output = await _analyse(content, description, page_count, provider, mock_meta)
+        output = await _analyse(content, description, page_count, profile, provider, mock_meta)
     except LLMError as exc:
         raise _failure(exc, settings) from exc
+
+    incident = None
+    if profile == "incident":
+        try:
+            incident, incident_warnings = await extract_incident(
+                content=content,
+                content_description=description,
+                page_count=page_count,
+                visual_elements=visual_elements,
+                provider=provider,
+                settings=settings,
+                mock_meta=mock_meta,
+            )
+            warnings.extend(incident_warnings)
+        except LLMError as exc:
+            # The core analysis is still useful; say clearly what is missing.
+            logger.warning(
+                "Incident extraction failed", extra={"stage": "analysing", "code": exc.code}
+            )
+            warnings.append(
+                DocumentWarning(
+                    code=WarningCode.INCIDENT_EXTRACTION_FAILED,
+                    message="The incident facts (claims, consistency checks) could not be "
+                    "extracted. The general analysis below is still available.",
+                )
+            )
 
     output = drop_artefact_items(output, extracted.boilerplate_lines, full_text)
     output, removed = clean_citations(output, page_count)
@@ -141,6 +170,7 @@ async def analyse_document(
         profile=profile,
         visual_elements=visual_elements,
         warnings=warnings,
+        incident=incident,
         **output.model_dump(),
     )
 
@@ -207,10 +237,18 @@ def clean_citations(
 # --------------------------------------------------------------------------- model calls
 
 
+# Incident reports record people by role, never by name (CLAUDE.md section 8).
+_PROFILE_RULES = {
+    "incident": "- This is an incident report: record people by ROLE only (for example "
+    '"driver of the silver car"), never by name, even if the report names them.\n',
+}
+
+
 async def _analyse(
     content: str,
     description: str,
     page_count: int,
+    profile: Profile,
     provider: LLMProvider,
     mock_meta: dict[str, object],
 ) -> DocumentAnalysisModelOutput:
@@ -221,6 +259,7 @@ async def _analyse(
         content_description=description,
         boundary=boundary,
         content=wrapped,
+        profile_rules=_PROFILE_RULES.get(profile, ""),
     )
     request = LLMRequest(
         task=LLMTask.DOCUMENT_ANALYSIS,

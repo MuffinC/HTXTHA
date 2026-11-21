@@ -80,10 +80,12 @@ const fixture: JobResponse = {
                 "licence_plate"
               ]
             },
+            "scene": null,
             "ai_generated": true
           }
         ],
-        "warnings": []
+        "warnings": [],
+        "incident": null
       }
     },
     {
@@ -126,7 +128,8 @@ const fixture: JobResponse = {
           }
         ],
         "visual_elements": [],
-        "warnings": []
+        "warnings": [],
+        "incident": null
       }
     },
     {
@@ -184,7 +187,8 @@ const fixture: JobResponse = {
             "message": "This page contains text that looks like instructions to an AI system (ignore_instructions, reveal_instructions, system_prompt). It was analysed as data only; review the AI output for this document with extra care.",
             "page": 2
           }
-        ]
+        ],
+        "incident": null
       }
     }
   ],
@@ -282,7 +286,9 @@ const fixture: JobResponse = {
     "information_gaps": [
       "[MOCK] No independent witness is cited."
     ],
-    "warnings": []
+    "warnings": [],
+    "possibly_related_groups": [],
+    "rule_based": false
   },
   "consolidated_error": null
 };

@@ -19,6 +19,7 @@ Two demo aids, so every UI state can be shown without a model:
 
 import asyncio
 import json
+import re
 from typing import Any
 
 from app.llm.base import LLMProvider, LLMRequest, LLMResult, LLMTask
@@ -47,6 +48,7 @@ class MockProvider(LLMProvider):
             LLMTask.DOCUMENT_ANALYSIS: _document_output,
             LLMTask.CHUNK_NOTES: _chunk_notes_output,
             LLMTask.CONSOLIDATION: _consolidation_output,
+            LLMTask.INCIDENT_EXTRACTION: _incident_output,
         }
         payload = builders[request.task](request.metadata)
         return LLMResult(
@@ -108,7 +110,19 @@ def _visual_output(metadata: dict[str, Any]) -> dict[str, Any]:
             ],
             "information_gaps": ["[MOCK] The time the photo was taken is not shown."],
             "sensitive_content": {"graphic": False, "pii_visible": ["licence_plate"]},
+            # Used by the incident profile (required there; ignored by the general schema).
+            "scene": {
+                "lighting": "daylight",
+                "weather": "clear",
+                "road_surface": "dry",
+                "vehicles_visible": "1",
+                "vehicle_types": ["car"],
+                "damage_locations": ["front"],
+                "traffic_signal": "not_visible",
+                "timestamp_visible": None,
+            },
         }
+    element.setdefault("scene", _UNCLEAR_SCENE)
     return {"elements": [element]}
 
 
@@ -174,4 +188,141 @@ def _consolidation_output(metadata: dict[str, Any]) -> dict[str, Any]:
         ],
         "related_document_groups": [{"documents": labels, "reason": "[MOCK] Same incident."}],
         "information_gaps": ["[MOCK] No independent witness is cited."],
+    }
+
+
+_UNCLEAR_SCENE: dict[str, Any] = {
+    "lighting": "unclear",
+    "weather": "unclear",
+    "road_surface": "unclear",
+    "vehicles_visible": "unclear",
+    "vehicle_types": [],
+    "damage_locations": [],
+    "traffic_signal": "unclear",
+    "timestamp_visible": None,
+}
+
+# ---------------------------------------------------------------- incident extraction
+# Keyword matching over the page text, so the incident UI (grouping, contradictions,
+# consistency checks) behaves realistically on the sample tickets without a model.
+# It is deliberately simple; the real extraction is done by the model.
+
+_FORM_FIELDS = {
+    "reference_no": r"(?:reference(?: no\.?)?|ref)[:\s]+([A-Z]{2,6}(?:-\d{2,6})+)",
+    "submitted_at": r"submitted(?: on)?[:\s]+([^\n]+)",
+    "occurred_date": r"date of incident[:\s]+([^\n]+)",
+    "occurred_time": r"(?:approx\.? )?time of incident[:\s]+([^\n]+)",
+    "location": r"location(?: of incident)?[:\s]+([^\n]+)",
+}
+_NUMBERS = {"one": "1", "two": "2", "three": "3", "four": "4_or_more"}
+
+
+# Form labels of the e-report layout; any other "Words: more words" line is prose.
+_FORM_LINE = re.compile(
+    r"^(?:reference no|submitted on|category|date of incident|approx\. time of incident|"
+    r"location|reporter|contact number|attachments|declaration)\b[^:]*:",
+    re.IGNORECASE,
+)
+
+
+def _sentences(page_texts: dict[Any, str]) -> list[tuple[int, str]]:
+    """Narrative sentences per page. "Label: value" form lines are skipped, and the
+    remaining lines are re-joined first, because PDF text wraps mid-sentence."""
+    out: list[tuple[int, str]] = []
+    for page, text in page_texts.items():
+        prose = " ".join(line for line in text.splitlines() if not _FORM_LINE.match(line.strip()))
+        for sentence in re.split(r"(?<=[.!?])\s+", " ".join(prose.split())):
+            if len(sentence) >= 20:
+                out.append((int(page), sentence))
+    return out
+
+
+def _find(
+    sentences: list[tuple[int, str]], pattern: str, value: str | None = None
+) -> dict[str, Any] | None:
+    for page, sentence in sentences:
+        match = re.search(pattern, sentence, re.IGNORECASE)
+        if match:
+            # First group that matched (patterns may have alternatives).
+            found = value or next(g for g in match.groups() if g).lower()
+            return {"value": found, "as_written": sentence[:160], "page": page}
+    return None
+
+
+def _incident_output(metadata: dict[str, Any]) -> dict[str, Any]:
+    page_texts: dict[Any, str] = metadata.get("page_texts", {})
+    full = "\n".join(page_texts.values())
+    sentences = _sentences(page_texts)
+    narrative = sentences
+
+    def form(name: str) -> str | None:
+        m = re.search(_FORM_FIELDS[name], full, re.IGNORECASE)
+        return m.group(1).strip() if m else None
+
+    def first(*options: dict[str, Any] | None) -> dict[str, Any]:
+        return next((o for o in options if o), {"value": "not_mentioned"})
+
+    count = _find(
+        narrative, r"\b(one|two|three|four)\s+(?:cars?|vehicles?)\b(?! (?:was|were) waiting)"
+    )
+    if count:
+        count["value"] = _NUMBERS.get(count["value"], "not_mentioned")
+    facts = {
+        "traffic_light": first(
+            _find(narrative, r"\b(red|amber|green)\b.*\blight|\blight\b.*\b(red|amber|green)\b")
+        ),
+        "vehicle_count": first(count),
+        "weather": first(
+            _find(narrative, r"\b(rain(?:ing)?|drizzle|downpour)\b", "rain"),
+            _find(narrative, r"\bweather was (?:dry|fine|clear)\b", "clear"),
+        ),
+        "road_surface": first(
+            _find(narrative, r"\broad was (wet|dry|flooded)\b"),
+            _find(narrative, r"\b(wet|flooded) road\b"),
+        ),
+        "lighting": first(
+            _find(narrative, r"\bstreet ?lights? (?:were|was) on\b", "night_street_lit"),
+            _find(narrative, r"\b(?:very|pitch) dark\b", "night_dark"),
+        ),
+        "injuries": first(
+            _find(
+                narrative,
+                r"\b(?:nobody|no one) (?:was|appeared to be) (?:hurt|injured)|no injuries\b"
+                r"|\b(?:was|were) not (?:hurt|injured)\b",
+                "none",
+            ),
+            _find(narrative, r"\b(?:hurt|injur\w*|holding (?:his|her) arm|bleeding)\b", "injury"),
+        ),
+        "party_left_scene": first(
+            _find(narrative, r"\b(?:drove|rode|sped) off\b|\bleft the scene\b", "yes"),
+            _find(narrative, r"\b(?:both|all) (?:drivers|parties) stayed\b", "no"),
+        ),
+        "vehicle_types": sorted(
+            {
+                t
+                for t in ("car", "taxi", "motorcycle", "bus", "lorry", "van")
+                if re.search(rf"\b{t}s?\b", full, re.I)
+            }
+        ),
+        "damage_locations": [],
+    }
+    for name, fact in facts.items():
+        if isinstance(fact, dict) and fact["value"] == "not_mentioned":
+            facts[name] = {"value": "not_mentioned", "as_written": None, "page": None}
+    collision = re.search(r"\b(collid\w*|collision|crash\w*|hit)\b", full, re.I)
+    return {
+        "reference_no": form("reference_no"),
+        "submitted_at": form("submitted_at"),
+        "occurred_date": form("occurred_date"),
+        "occurred_time": form("occurred_time"),
+        "location": form("location"),
+        "category": "road_traffic" if collision else "other",
+        "category_confidence": "medium",
+        "narrative_summary": "[MOCK] " + (narrative[0][1] if narrative else "No narrative found."),
+        "parties": [
+            {"role": "[MOCK] reporter", "description": "[MOCK] the person who submitted the report"}
+        ],
+        "facts": facts,
+        "other_claims": [],
+        "missing_information": [],
     }

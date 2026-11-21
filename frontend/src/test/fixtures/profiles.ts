@@ -12,8 +12,8 @@ const fixture: ProfileInfo[] = [
   {
     "id": "incident",
     "name": "Incident",
-    "description": "Incident tickets and reports: claims, parties, consistency between the narrative and attached photos, and evidence-style photo observations.",
-    "available": false
+    "description": "Incident tickets and reports: the reporter's facts with page references, checks against their own photos, and same-incident grouping with contradictions across reports.",
+    "available": true
   },
   {
     "id": "statistical",

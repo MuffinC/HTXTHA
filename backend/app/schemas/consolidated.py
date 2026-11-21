@@ -98,6 +98,19 @@ class DocumentGroup(BaseModel):
     reason: str
 
 
+class IncidentNarrativeOutput(BaseModel):
+    """Incident profile: the model writes only the narrative parts of the report.
+
+    Contradictions, agreements, the timeline and same-incident groups are
+    computed by code from the extracted facts (DECISIONS D-057), so the model is
+    not asked for them.
+    """
+
+    overall_summary: str
+    common_themes: list[ThemeModel]
+    information_gaps: list[str]
+
+
 class ConsolidatedReport(BaseModel):
     """One per job (CLAUDE.md section 8).
 
@@ -113,3 +126,8 @@ class ConsolidatedReport(BaseModel):
     related_document_groups: list[DocumentGroup]
     information_gaps: list[str]
     warnings: list[DocumentWarning] = Field(default_factory=list)
+    # Incident profile (addition, D-057): pairs whose date and time match but whose
+    # location is missing or does not match. Never used for contradictions.
+    possibly_related_groups: list[DocumentGroup] = Field(default_factory=list)
+    # True when contradictions/agreements/timeline/groups were computed by rule (incident).
+    rule_based: bool = False

@@ -5,6 +5,7 @@ import App from './App';
 import type { JobResponse } from './api/types';
 import jobCompleted from './test/fixtures/jobCompleted';
 import jobFailed from './test/fixtures/jobFailed';
+import jobIncident from './test/fixtures/jobIncident';
 import jobPartial from './test/fixtures/jobPartial';
 import { mockApi, pdfFile, setUrl } from './test/mockApi';
 
@@ -117,8 +118,9 @@ describe('upload', () => {
   it('only offers available profiles', async () => {
     mockApi();
     render(<App />);
-    expect(await screen.findByRole('option', { name: 'Incident (coming later)' })).toBeDisabled();
+    expect(await screen.findByRole('option', { name: 'Statistical (coming later)' })).toBeDisabled();
     expect(screen.getByRole('option', { name: 'General' })).toBeEnabled();
+    expect(screen.getByRole('option', { name: 'Incident' })).toBeEnabled();
   });
 });
 
@@ -188,6 +190,54 @@ describe('results from a completed job', () => {
     setUrl({ job: ID, tab: job.documents[0]!.document_id });
     render(<App />);
     expect(await screen.findByText('phone redacted')).toHaveClass('redacted');
+  });
+});
+
+describe('incident profile (real mock-mode API output for the four sample tickets)', () => {
+  const byName = (name: string) => jobIncident.documents.find((d) => d.filename === name)!;
+
+  it('shows rule-based same-incident groups and contradictions in the consolidated report', async () => {
+    mockApi({ jobs: { [jobIncident.job_id]: jobIncident } });
+    setUrl({ job: jobIncident.job_id });
+    render(<App />);
+
+    const group = await screen.findByRole('region', { name: 'Same incident' });
+    expect(within(group).getByText(/Same incident by rule \(D1, D2, D3\)/)).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    const lightRow = within(table).getByText('Traffic light').closest('tr')!;
+    // D3 does not mention the light, so it is not a position; labels are not duplicated.
+    expect(within(lightRow).getAllByRole('button').map((b) => b.textContent)).toEqual(['D1 p.1', 'D2 p.1']);
+    expect(lightRow).not.toHaveTextContent('D1: green');
+    expect(screen.getAllByText('Rule-based').length).toBeGreaterThan(1);
+  });
+
+  it('shows the ticket, the reporter facts and the narrative-vs-photo checks', async () => {
+    const t4 = byName('t4_unrelated_tree.pdf');
+    mockApi({ jobs: { [jobIncident.job_id]: jobIncident } });
+    setUrl({ job: jobIncident.job_id, tab: t4.document_id });
+    render(<App />);
+
+    const ticket = await screen.findByRole('region', { name: 'Ticket' });
+    expect(within(ticket).getByText('CW-24-1004')).toBeInTheDocument();
+    expect(within(ticket).getByText(/2025-03-17 23:00/)).toBeInTheDocument();
+
+    const facts = screen.getByRole('region', { name: 'Reported facts' });
+    const weather = within(facts).getByText('Weather').closest('tr')!;
+    expect(weather).toHaveTextContent('Inconsistent');
+    expect(within(facts).getByText('Traffic light').closest('tr')).toHaveTextContent('Not mentioned');
+
+    const checks = screen.getByRole('region', { name: 'Narrative vs photo' });
+    expect(within(checks).getAllByText('Inconsistent')).toHaveLength(2);
+    expect(screen.getByLabelText('Scene fields')).toHaveTextContent('daylight');
+  });
+
+  it('says when a ticket has no photo to check against', async () => {
+    const t2 = byName('t2_taxi_driver.pdf');
+    mockApi({ jobs: { [jobIncident.job_id]: jobIncident } });
+    setUrl({ job: jobIncident.job_id, tab: t2.document_id });
+    render(<App />);
+    expect(await screen.findByText(/No photo attached, so these facts cannot be checked/)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Missing information' })).toBeInTheDocument();
   });
 });
 

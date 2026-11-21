@@ -46,7 +46,11 @@ from app.llm.structured import generate_structured
 from app.pipeline.extraction import render_page_png
 from app.schemas.common import DocumentWarning, Profile, WarningCode
 from app.schemas.extraction import ExtractedDocument, PageContent
-from app.schemas.visual import VisualElement, VisualPageModelOutput
+from app.schemas.visual import (
+    IncidentVisualPageModelOutput,
+    VisualElement,
+    VisualPageModelOutput,
+)
 from app.security.injection import injection_warnings
 from app.security.pii import mask_pii_in
 
@@ -161,8 +165,12 @@ async def analyse_visuals(
             continue
 
         try:
+            # Incident profile: the scene fields are required, so the model must answer each.
+            schema = (
+                IncidentVisualPageModelOutput if profile == "incident" else VisualPageModelOutput
+            )
             output, _ = await generate_structured(
-                provider, build_visual_request(png, page, profile), VisualPageModelOutput
+                provider, build_visual_request(png, page, profile), schema
             )
         except LLMError as exc:
             model_unavailable = isinstance(exc, LLMUnavailableError)
@@ -236,6 +244,9 @@ def to_visual_elements(output: VisualPageModelOutput, page: int) -> list[VisualE
             data["table_markdown"] = None
         if item.type != "scanned_text":
             data["transcription"] = None
+        # Scene fields describe a photographed scene; meaningless for charts or tables.
+        if item.type != "photo":
+            data["scene"] = None
         elements.append(VisualElement(page=page, **data))
     return elements
 

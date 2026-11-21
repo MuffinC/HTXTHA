@@ -79,6 +79,20 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   text (in the live scorecard, report B's "SYNTHETIC SAMPLE" footer still became an
   entity). A header or footer outside the top or bottom 8% of the page is not detected.
   (D-043)
+- A-121: If an incident report gives a time but no date, the incident is assumed to be the latest
+  occurrence of that time before the report was submitted. For example, "21:15" submitted at
+  21:40 gives the same day, and "21:30" submitted at 08:05 gives the previous day. The UI marks
+  the derived date "(assumed)" and its tooltip says why. (`incident_rules.derive_facts`,
+  `# ASSUMPTION:`)
+- A-122: Expected lighting uses fixed Singapore daylight hours (daylight 07:15–19:00, dusk or
+  dawn 06:45–07:15 and 19:00–19:30, otherwise night). Singapore's sunrise and sunset vary by
+  only about 30 minutes over the year, so no astronomical calculation is used.
+- A-123: Reporters' times are estimates. Reports within 60 minutes can be the same incident,
+  and times more than 10 minutes apart are reported as a contradiction (DECISIONS D-058). These
+  are named constants, easy to change.
+- A-124: Relative dates are resolved only for a fixed list of phrases (last night, yesterday,
+  tonight, today, this morning, afternoon or evening). Others, such as "the other day" or "on
+  Saturday", leave the date unknown, which is reported as missing information.
 
 ## Frontend
 
@@ -167,3 +181,16 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   Self-hosting the Swagger assets would fix this.
 - L-010: The `ollama/ollama` image runs as root inside its container (a third-party image). Its
   port is not published and only the backend can reach it.
+- L-011: Location matching has no gazetteer. Different names for the same place ("AMK Hub"
+  against "Ang Mo Kio Ave 3") do not match, and reports that differ only in this way are not
+  grouped. If date and time match but the location is unknown, the pair is shown as "possibly
+  related" instead.
+- L-012: Quote grounding (DECISIONS D-058) uses cue-word lists. A correct value stated in
+  unusual words, such as "visibility was terrible" for lighting, can be downgraded to "not
+  mentioned". That loses a fact but never invents a contradiction.
+- L-013: Narrative-against-photo checks assume the photo shows the scene at the time of the
+  incident. A photo taken the next morning would be flagged as inconsistent on lighting, so the
+  analyst has to judge whether the timing explains the difference.
+- L-014: The mock provider's incident extraction is keyword matching tuned to the sample ticket
+  layout. It demonstrates the UI and rules on the sample tickets but extracts little from
+  arbitrary documents.

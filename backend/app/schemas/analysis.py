@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.common import DocumentWarning, Profile
+from app.schemas.incident import IncidentExtension
 from app.schemas.visual import VisualElement
 
 EntityType = Literal[
@@ -68,8 +69,8 @@ class ChunkNotes(BaseModel):
 class DocumentAnalysis(BaseModel):
     """Per-document result (CLAUDE.md section 8).
 
-    ``incident``, ``statistical`` and ``triage`` arrive with the incident
-    profile (M6), the statistical profile (M8) and triage (M7).
+    ``incident`` is set for the incident profile (M6). ``statistical`` and
+    ``triage`` arrive with the statistical profile (M8) and triage (M7).
     """
 
     document_id: str
@@ -83,3 +84,4 @@ class DocumentAnalysis(BaseModel):
     notable_points: list[NotablePoint]
     visual_elements: list[VisualElement]
     warnings: list[DocumentWarning]
+    incident: IncidentExtension | None = None

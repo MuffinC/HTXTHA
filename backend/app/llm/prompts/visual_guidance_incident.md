@@ -15,3 +15,15 @@ Keep three lists strictly separate:
 - "information_gaps": what an investigator would want to know but cannot tell from the photo (for example "time of day cannot be determined", "no other vehicle is visible").
 
 Never assign fault, never state speed or cause as fact, and never say who was responsible.
+
+SCENE FIELDS
+Every element has a "scene" object, and every field in it must be answered. For a photo, judge each field from the image only. For an element that is not a photo, set every field to "unclear" and leave the lists empty.
+- lighting: daylight, dusk_or_dawn, night_street_lit, night_dark, or unclear.
+- weather: clear, overcast, rain, fog, or unclear (look at the sky, rain streaks, umbrellas, reflections).
+- road_surface: dry, wet, flooded, or unclear.
+- vehicles_visible: how many vehicles appear to be involved in the incident (damaged, or in collision positions): none, 1, 2, 3, 4_or_more, or unclear.
+- vehicle_types: the types of those vehicles.
+- damage_locations: where damage is visible (front, rear, left_side, right_side, windscreen, roof), or none_visible, or unclear.
+- traffic_signal: the state of a traffic light visible in the photo, or not_visible, or unclear.
+- timestamp_visible: a date or time printed in the image, copied exactly, or null.
+Use "unclear" whenever you cannot tell from the image. Do not use the report's text to fill these fields.

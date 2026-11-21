@@ -37,6 +37,7 @@ from app.config import Settings
 from app.main import create_app
 from tests import pdf_factory
 from tests.conftest import app_client
+from tests.ticket_factory import TICKETS, ticket_pdf
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "frontend" / "src" / "test" / "fixtures"
 UPDATE = os.environ.get("UPDATE_FRONTEND_FIXTURES") == "1"
@@ -89,11 +90,13 @@ def check_fixture(name: str, type_name: str, data: Any) -> None:
     )
 
 
-async def _run_job(client: httpx.AsyncClient, files: list[tuple[str, bytes]]) -> dict[str, Any]:
+async def _run_job(
+    client: httpx.AsyncClient, files: list[tuple[str, bytes]], profile: str = "general"
+) -> dict[str, Any]:
     response = await client.post(
         "/api/jobs",
         files=[("files", (name, data, "application/pdf")) for name, data in files],
-        data={"profile": "general"},
+        data={"profile": profile},
     )
     assert response.status_code == 202, response.text
     job_id = response.json()["job_id"]
@@ -123,6 +126,15 @@ async def test_completed_job_fixture(mock_client: httpx.AsyncClient) -> None:
     assert job["status"] == "completed"
     assert job["consolidated"] is not None
     check_fixture("jobCompleted.ts", "JobResponse", job)
+
+
+async def test_incident_job_fixture(mock_client: httpx.AsyncClient) -> None:
+    job = await _run_job(
+        mock_client, [(f"{t.key}.pdf", ticket_pdf(t)) for t in TICKETS], profile="incident"
+    )
+    assert job["status"] == "completed"
+    assert job["consolidated"]["rule_based"] is True
+    check_fixture("jobIncident.ts", "JobResponse", job)
 
 
 async def test_partial_job_fixture(mock_client: httpx.AsyncClient) -> None:

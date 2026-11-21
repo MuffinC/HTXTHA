@@ -80,10 +80,12 @@ const fixture: JobResponse = {
                 "licence_plate"
               ]
             },
+            "scene": null,
             "ai_generated": true
           }
         ],
-        "warnings": []
+        "warnings": [],
+        "incident": null
       }
     },
     {

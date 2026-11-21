@@ -949,6 +949,141 @@ fail.
   as ")".
 - **Milestone:** M5 (review of M4)
 
+## D-057 Incident profile: the model extracts, code compares
+
+- **Problem (M3 scorecard, D-042):** asking a 4B model to compare reports gave unstable,
+  partly wrong contradictions. It found the traffic light in only 1 of 14 runs, sometimes
+  counted "one report is silent" as a contradiction, and grouped inconsistently.
+- **Design:** the model only fills closed-list fields; code does every comparison with stated
+  rules (`app/pipeline/incident_rules.py`), so results are repeatable and explained.
+
+  | Step | Model | Code |
+  |---|---|---|
+  | Photo pages | `SceneObservation`: required fields (lighting, weather, road surface, vehicles visible, vehicle types, damage locations, traffic signal, visible timestamp), each with an "unclear" option | Kept only on photos |
+  | Ticket text | `IncidentExtractionOutput`: ticket header as written, facts as closed lists with quote and page, parties by role, other claims (**one extra call per document**) | Quote grounding (D-058), parsed times, dates from relative phrases or assumed, citation checks |
+  | Narrative vs photo | — | `consistency_checks`, claim corroboration |
+  | Same incident | — | Category, date, 60-min window, location rules |
+  | Across tickets | Overall summary, themes, gaps only (`IncidentNarrativeOutput`) | Contradictions, agreements, timeline |
+
+- **Required scene fields:** L-006 showed that asking for lighting, weather and road surface in
+  free text was ignored. Required fields force an answer, "unclear" included. The rule that
+  would have marked a scene field "unclear" when the free-text description disagreed was
+  dropped at review: parsing free text against the fields is brittle, so the fields are
+  trusted.
+- **Schema additions to the spec:** `IncidentExtension.facts` (normalised values with quotes)
+  and `.derived` (date, time and expected lighting, each with how it was derived);
+  `VisualElement.scene`; `ConsolidatedReport.possibly_related_groups` and `.rule_based`;
+  warning `INCIDENT_EXTRACTION_FAILED`. If extraction fails after one retry, the core analysis
+  is kept and only the incident sections are missing.
+- **The consolidation prompt receives the rule findings** (groups, contradictions, agreements)
+  as document labels and closed-list values only. No quoted document text appears outside the
+  untrusted-content markers. The summary therefore agrees with the rules, and the model is told
+  not to add contradictions.
+- **People by role:** in the incident profile, the analysis and extraction prompts both require
+  roles, never names (CLAUDE.md section 8).
+- **Milestone:** M6
+
+## D-058 Incident rules and constants
+
+All tunable values are named constants at the top of `incident_rules.py`.
+
+- **Tolerances:** `CONTRADICTION_TIME_TOLERANCE_MIN = 10`; times further apart are a
+  contradiction. `SAME_INCIDENT_WINDOW_MIN = 60`; reports must be within this window to be the
+  same incident. The window is wider because reporters estimate times differently.
+- **Times and dates:**
+  - Times are parsed from the quote: "21:15", "9.15pm", "9 pm", "2130hrs", "midnight". A date
+    such as "14.03.2025" is never read as a time.
+  - Dates are day-first, as used in Singapore.
+  - Relative phrases are resolved against the submission date, from a fixed list (last night,
+    yesterday, tonight, this morning/afternoon/evening, today). The source is shown.
+  - If no date is stated, the incident is **assumed** to be the latest occurrence of the stated
+    time before submission. This is labelled "assumed" in the UI (A-121). It is needed for
+    reports that give only a time, like the M3 pair.
+- **Expected lighting:** daylight 07:15–19:00, dusk or dawn 06:45–07:15 and 19:00–19:30,
+  otherwise night (Singapore, A-122).
+- **Location matching, offline with no geocoding:**
+  - Lower-case, strip punctuation, and expand abbreviations: Ave, Rd, St, Jln, Blk, Ctr, Bt,
+    Upp, AMK, Lor, Dr, Cres, TPY, CCK, and others.
+  - Drop filler words: near, at, the, of, junction, outside, opposite, beside, **and**, by,
+    along, with, and others.
+  - **Strong:** a shared 6-digit postal code, or identical remaining place words.
+  - **Partial:** a Jaccard overlap of at least 0.5. **None** otherwise, and **unknown** if a
+    location is missing.
+- **Grouping:**
+  - **Same incident:** same category, same derived date, times within 60 minutes (or one
+    unknown), and a location match that is at least partial. Groups are transitive (union-find).
+  - **Possibly related:** not contradicted on date or time, but the location (or a date) is
+    unknown. Shown separately and never compared.
+  - Each group carries the rule evidence as its reason.
+- **Contradictions and agreements:** only within a same-incident group, and **only between
+  reports that state a value**, so absence never creates a contradiction. One entry per field
+  lists every report's value and quote with a page chip. Agreements: every report that states
+  the field gives the same value.
+- **Narrative vs photo:**
+  - Rain against a wet or flooded road or rainy weather in the photo is consistent; rain
+    against a dry road is inconsistent.
+  - Road surface is compared like for like.
+  - Lighting uses the stated lighting or, failing that, the lighting expected from the stated
+    time; dusk against either is unclear.
+  - The traffic signal is compared only if visible in the photo. Damage locations: any overlap
+    is consistent, otherwise unclear. A visible timestamp is compared with the stated time
+    (10-minute tolerance).
+  - **Vehicle count is never checked against a photo**, because vehicles can be out of frame.
+  - With several photos, any inconsistent result wins, then consistent, otherwise unclear.
+- **Quote grounding (added after the first live run):** a stated value counts only if its quote
+  supports it. The quote must be present, must not read as "not mentioned", and must contain a
+  cue word for the field (`GROUNDING_CUES`; vehicle count is exempt). Otherwise the value is
+  downgraded to "not mentioned" and counted in the logs (`facts_ungrounded`). The live
+  evidence:
+  - lighting "night (dark)" from the quote "at about 9.20pm";
+  - road surface "dry" from "The weather was dry";
+  - a value whose quote was "not mentioned".
+
+  Together these produced two false contradictions. This is a code check, not prompt tuning.
+- **Milestone:** M6
+
+## D-059 Synthetic tickets and mock-mode keyword extraction
+
+- `scripts/generate_sample_tickets.py` renders four two-page e-report forms
+  (`tests/ticket_factory.py`) from a **fictional** portal, "CityWatch e-Report":
+  - real public Singapore road names, but invented events and reporters;
+  - placeholder contact numbers only (9123 4567, 8123 4567, 6123 4567), never random ones;
+  - a "SYNTHETIC SAMPLE" footer on every page;
+  - page 2 holds the attachments.
+- T1–T3 report one incident at the Ang Mo Kio Ave 3 and Ave 8 junction with planted
+  contradictions (time, traffic light, vehicle count, weather, injuries, a party leaving the
+  scene). T3 omits the traffic light, which tests that absence is not a contradiction.
+- T4 is an unrelated incident (Upper Thomson Road, 17 March). Its narrative ("raining heavily,
+  very dark, around 11pm") contradicts its own photo, the public-domain `car_crash_1.jpg`
+  (daylight, dry road).
+- Expected findings are in `ticket_factory.PLANTED`.
+- **Mock provider:** extracts incident facts with keyword patterns over the page text (form
+  labels; light colours; "two/three vehicles"; rain or drizzle; "nobody was hurt"; "drove off"),
+  and gives its sample photo a daylight, dry scene. Grouping, contradictions and
+  narrative-against-photo checks therefore demonstrate realistically in mock mode: on the four
+  tickets it finds all 6 planted contradictions and both T4 inconsistencies, with 0 false
+  positives.
+- **Milestone:** M6
+
+## D-061 Incident UI
+
+- **Document view (incident profile):**
+  - a **ticket card** (reference, submitted, category with confidence, the time as written plus
+    a derived "→ 2025-03-14 21:30" chip whose tooltip gives the source, marked "(assumed)" when
+    assumed, and the location as written);
+  - a **reported facts** table (quote and page chip, normalised value, and a badge comparing it
+    with the photo: Consistent, Inconsistent or Unclear, or Not checkable / No photo attached);
+  - **narrative vs photo** checks with page chips, **other claims**, **parties by role** and
+    **missing information**;
+  - visual cards for photos show a compact **scene grid**, with "unclear" in muted italics.
+- **Consolidated view (rule-based):** a **Same incident** section (document chips and the rule
+  evidence), **Possibly related** pairs, and contradictions and agreements, each with a
+  **Rule-based** tag explaining the rule (the 60-minute window and 10-minute tolerance are
+  stated). The label is stripped from the position text because the citation chip already
+  shows "D1 p.1".
+- `/api/profiles` marks the incident profile available. Statistical stays unavailable until M8.
+- **Milestone:** M6
+
 ---
 
 ## Pending decisions (to record when made)

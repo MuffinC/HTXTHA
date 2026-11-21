@@ -21,7 +21,8 @@ export type WarningCode =
   | 'TABLE_EXTRACTION_FAILED'
   | 'VISUAL_ANALYSIS_FAILED'
   | 'CITATIONS_REMOVED'
-  | 'CONTENT_TRUNCATED';
+  | 'CONTENT_TRUNCATED'
+  | 'INCIDENT_EXTRACTION_FAILED';
 
 export interface DocumentWarning {
   code: WarningCode;
@@ -88,6 +89,90 @@ export interface ChartDetails {
   trend: string;
 }
 
+// ---------------------------------------------------------------- incident profile
+
+export type Lighting = 'daylight' | 'dusk_or_dawn' | 'night_street_lit' | 'night_dark';
+export type Weather = 'clear' | 'overcast' | 'rain' | 'fog';
+export type RoadSurface = 'dry' | 'wet' | 'flooded';
+export type VehicleType = 'car' | 'taxi' | 'motorcycle' | 'bus' | 'lorry' | 'van' | 'bicycle' | 'other';
+export type DamageLocation = 'front' | 'rear' | 'left_side' | 'right_side' | 'windscreen' | 'roof';
+export type VehicleCount = '1' | '2' | '3' | '4_or_more';
+export type SignalState = 'red' | 'amber' | 'green';
+
+/** Required scene fields on incident photos (the model must answer each one). */
+export interface SceneObservation {
+  lighting: Lighting | 'unclear';
+  weather: Weather | 'unclear';
+  road_surface: RoadSurface | 'unclear';
+  vehicles_visible: 'none' | VehicleCount | 'unclear';
+  vehicle_types: VehicleType[];
+  damage_locations: (DamageLocation | 'none_visible' | 'unclear')[];
+  traffic_signal: SignalState | 'not_visible' | 'unclear';
+  timestamp_visible: string | null;
+}
+
+/** One fact as the reporter states it: normalised value, exact quote, page. */
+export interface Stated<T extends string> {
+  value: T | 'not_mentioned';
+  as_written: string | null;
+  page: number | null;
+}
+
+export interface IncidentFacts {
+  traffic_light: Stated<SignalState | 'not_working'>;
+  vehicle_count: Stated<VehicleCount>;
+  weather: Stated<Weather>;
+  road_surface: Stated<RoadSurface>;
+  lighting: Stated<Lighting>;
+  injuries: Stated<'none' | 'injury' | 'serious_or_fatal'>;
+  party_left_scene: Stated<'yes' | 'no'>;
+  vehicle_types: VehicleType[];
+  damage_locations: DamageLocation[];
+}
+
+export type FactField = Exclude<keyof IncidentFacts, 'vehicle_types' | 'damage_locations'>;
+
+export interface DerivedValue {
+  value: string;
+  source: string;
+}
+
+export interface IncidentClaim {
+  claim: string;
+  page: number | null;
+  corroboration: 'supported' | 'contradicted' | 'not_verifiable';
+  note: string;
+}
+
+export interface ConsistencyCheck {
+  check: string;
+  result: 'consistent' | 'inconsistent' | 'unclear';
+  details: string;
+  pages: number[];
+}
+
+export interface IncidentExtension {
+  ticket: {
+    reference_no: string | null;
+    submitted_at: string | null;
+    category: 'road_traffic' | 'theft' | 'fire' | 'public_disturbance' | 'other';
+    category_confidence: 'low' | 'medium' | 'high';
+  };
+  occurred_at_stated: string | null;
+  location_stated: string | null;
+  narrative_summary: string;
+  parties: { role: string; description: string }[];
+  claims: IncidentClaim[];
+  consistency_checks: ConsistencyCheck[];
+  missing_information: string[];
+  facts: IncidentFacts;
+  derived: {
+    incident_date: DerivedValue | null;
+    incident_time: DerivedValue | null;
+    expected_lighting: DerivedValue | null;
+  };
+}
+
 export interface VisualElement {
   page: number;
   type: VisualType;
@@ -99,6 +184,8 @@ export interface VisualElement {
   chart: ChartDetails | null;
   transcription: string | null;
   sensitive_content: { graphic: boolean; pii_visible: PiiCategory[] };
+  /** Incident profile, photos only. */
+  scene: SceneObservation | null;
   ai_generated: true;
 }
 
@@ -136,6 +223,7 @@ export interface DocumentAnalysis {
   notable_points: NotablePoint[];
   visual_elements: VisualElement[];
   warnings: DocumentWarning[];
+  incident: IncidentExtension | null;
 }
 
 // ---------------------------------------------------------------- consolidated report
@@ -149,6 +237,10 @@ export interface ConsolidatedReport {
   related_document_groups: { document_ids: string[]; reason: string }[];
   information_gaps: string[];
   warnings: DocumentWarning[];
+  /** Incident profile: pairs that may be the same incident (location missing/unclear). */
+  possibly_related_groups: { document_ids: string[]; reason: string }[];
+  /** True when contradictions, agreements, timeline and groups were computed by rule. */
+  rule_based: boolean;
 }
 
 // ---------------------------------------------------------------- jobs

@@ -13,11 +13,13 @@ removed, and the removal is counted in the logs and reported as a warning.
 
 import logging
 import re
+from dataclasses import dataclass
 
 from app.config import Settings
 from app.llm.base import LLMProvider, LLMRequest, LLMTask
 from app.llm.prompts import load_prompt, render_prompt
 from app.llm.structured import generate_structured
+from app.pipeline import incident_rules
 from app.pipeline.budget import content_budget_tokens, estimate_tokens, truncate_to_tokens
 from app.pipeline.citations import is_valid_page, removed_citations_warning
 from app.schemas.analysis import DocumentAnalysis
@@ -28,6 +30,7 @@ from app.schemas.consolidated import (
     ConsolidatedReport,
     Contradiction,
     DocumentGroup,
+    IncidentNarrativeOutput,
     LabelCitation,
     Position,
     Theme,
@@ -74,20 +77,50 @@ async def consolidate(
             )
         )
 
+    # Incident profile: groups, contradictions, agreements and the timeline are
+    # computed by rule; the model only writes the narrative parts (D-057).
+    incident = all(a.profile == "incident" for a in analyses)
+    rule = _incident_rule_findings(by_label) if incident else None
+
     wrapped, boundary = wrap_untrusted(content)
+    if rule is not None:
+        prompt = render_prompt(
+            "consolidation_incident",
+            count=len(by_label),
+            labels=labels,
+            boundary=boundary,
+            content=wrapped,
+            findings=rule.findings,
+        )
+    else:
+        prompt = render_prompt(
+            "consolidation", count=len(by_label), labels=labels, boundary=boundary, content=wrapped
+        )
     request = LLMRequest(
         task=LLMTask.CONSOLIDATION,
         system=load_prompt("system"),
-        prompt=render_prompt(
-            "consolidation", count=len(by_label), labels=labels, boundary=boundary, content=wrapped
-        ),
+        prompt=prompt,
         json_schema={},
         max_output_tokens=CONSOLIDATION_OUTPUT_TOKENS,
         metadata={"documents": {label: a.page_count for label, a in by_label.items()}},
     )
-    output, _ = await generate_structured(
-        provider, request, ConsolidatedModelOutput, retries=CONSOLIDATION_RETRIES
-    )
+    if rule is not None:
+        narrative, _ = await generate_structured(
+            provider, request, IncidentNarrativeOutput, retries=CONSOLIDATION_RETRIES
+        )
+        output = ConsolidatedModelOutput(
+            overall_summary=narrative.overall_summary,
+            common_themes=narrative.common_themes,
+            agreements=[],
+            contradictions=[],
+            timeline=[],
+            related_document_groups=[],
+            information_gaps=narrative.information_gaps,
+        )
+    else:
+        output, _ = await generate_structured(
+            provider, request, ConsolidatedModelOutput, retries=CONSOLIDATION_RETRIES
+        )
 
     # Mask while documents are still short labels (D1, D2), BEFORE they become
     # UUIDs: a UUID such as "...-cb96609844e7" contains a phone-like digit run,
@@ -100,7 +133,86 @@ async def consolidate(
     if warning:
         warnings.append(warning)
     report.warnings = warnings
+    if rule is not None:
+        report.contradictions = rule.contradictions
+        report.agreements = rule.agreements
+        report.timeline = rule.timeline
+        report.related_document_groups = rule.grouping.same_incident
+        report.possibly_related_groups = rule.grouping.possibly_related
+        report.rule_based = True
     return report
+
+
+@dataclass
+class IncidentRuleFindings:
+    """Rule-based cross-ticket results, plus a plain-text version for the prompt."""
+
+    grouping: incident_rules.Grouping
+    contradictions: list[Contradiction]
+    agreements: list[Agreement]
+    timeline: list[TimelineEvent]
+    findings: str
+
+
+def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRuleFindings:
+    """Group the tickets and compare their facts by rule (app.pipeline.incident_rules).
+
+    Documents whose incident extraction failed take no part in the rules.
+    """
+    tickets = [
+        incident_rules.ticket_for_comparison(
+            document_id=a.document_id,
+            label_=label,
+            category=a.incident.ticket.category,
+            location=a.incident.location_stated,
+            derived=a.incident.derived,
+            time_as_written=a.incident.occurred_at_stated,
+            facts=a.incident.facts,
+        )
+        for label, a in by_label.items()
+        if a.incident is not None
+    ]
+    grouping = incident_rules.group_incidents(tickets)
+    contradictions: list[Contradiction] = []
+    agreements: list[Agreement] = []
+    many = len(grouping.groups) > 1
+    for i, group in enumerate(grouping.groups, start=1):
+        found, agreed = incident_rules.compare_group(
+            group, suffix=f" (incident {i})" if many else ""
+        )
+        contradictions += found
+        agreements += agreed
+
+    # Plain-text findings for the prompt. Only labels, field names and closed-list
+    # values: no quoted document text appears outside the untrusted-content markers.
+    labels_by_id = {t.document_id: t.label for t in tickets}
+    lines: list[str] = []
+    grouped: set[str] = set()
+    for group in grouping.groups:
+        lines.append(f"- Same incident: {', '.join(t.label for t in group)}.")
+        grouped |= {t.document_id for t in group}
+    for pair in grouping.possibly_related:
+        pair_labels = ", ".join(labels_by_id[d] for d in pair.document_ids)
+        lines.append(f"- Possibly related, not confirmed: {pair_labels}.")
+    separate = [t.label for t in tickets if t.document_id not in grouped]
+    if separate:
+        lines.append(
+            f"- Separate incidents (no match by date, time and place): {', '.join(separate)}."
+        )
+    for c in contradictions:
+        values = "; ".join(p.position.split(" (“")[0] for p in c.positions)
+        lines.append(f"- Contradiction on {c.topic}: {values}.")
+    for a in agreements:
+        lines.append(f"- Agreement: {a.point.split(' (every')[0]}.")
+    if not lines:
+        lines.append("- No incident facts could be compared.")
+    return IncidentRuleFindings(
+        grouping=grouping,
+        contradictions=contradictions,
+        agreements=agreements,
+        timeline=incident_rules.build_timeline(tickets),
+        findings="\n".join(lines),
+    )
 
 
 def resolve_citations(
@@ -197,6 +309,9 @@ def _describe(label: str, a: DocumentAnalysis) -> str:
             for e in a.key_entities[:MAX_ENTITIES]
         ],
     ]
+    if a.incident:
+        lines.append(f"Incident location (as written): {a.incident.location_stated}")
+        lines.append(f"Incident time (as written): {a.incident.occurred_at_stated}")
     if a.visual_elements:
         lines.append("Visual elements (AI descriptions of images):")
         lines += [

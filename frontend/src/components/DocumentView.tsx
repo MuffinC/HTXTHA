@@ -4,6 +4,7 @@ import type { DocumentAnalysis } from '../api/types';
 import { ENTITY_GROUPS, plural } from '../lib/labels';
 import { CitationChip, Citations } from './Citations';
 import { Section, WarningBanner } from './Common';
+import { FactsTable, IncidentDetails, TicketCard } from './IncidentSections';
 import { ModelText } from './ModelText';
 import { VisualElementCard } from './VisualElementCard';
 
@@ -32,7 +33,15 @@ export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; 
 
       <WarningBanner warnings={analysis.warnings} documentId={id} />
 
-      <Section title="Summary">
+      {analysis.incident && (
+        <>
+          <TicketCard incident={analysis.incident} />
+          <FactsTable incident={analysis.incident} documentId={id} />
+          <IncidentDetails incident={analysis.incident} documentId={id} />
+        </>
+      )}
+
+      <Section title={analysis.incident ? 'Document summary' : 'Summary'}>
         <p className="lead">
           <ModelText text={analysis.summary} />
         </p>

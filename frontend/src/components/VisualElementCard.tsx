@@ -10,6 +10,7 @@ import { parseMarkdownTable } from '../lib/markdown';
 import { CitationChip } from './Citations';
 import { AiLabel } from './Common';
 import { Icon } from './Icon';
+import { SceneGrid } from './IncidentSections';
 import { ModelText } from './ModelText';
 
 function KeyValue({ value }: { value: string }) {
@@ -77,6 +78,7 @@ function Body({ element }: { element: VisualElement }) {
       <p className="visual-description">
         <ModelText text={element.description} />
       </p>
+      {element.scene && <SceneGrid scene={element.scene} />}
       {element.chart && (
         <div className="chart-details">
           <p className="muted small">

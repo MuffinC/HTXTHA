@@ -1,5 +1,14 @@
 // Human-readable labels for codes and statuses returned by the API.
-import type { DocumentStatus, EntityType, PiiCategory, VisualType, WarningCode } from '../api/types';
+import type {
+  ConsistencyCheck,
+  DocumentStatus,
+  EntityType,
+  FactField,
+  IncidentClaim,
+  PiiCategory,
+  VisualType,
+  WarningCode,
+} from '../api/types';
 
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
@@ -23,6 +32,11 @@ export const WARNING_INFO: Record<WarningCode, { title: string; tone: Tone; secu
   VISUAL_ANALYSIS_FAILED: { title: 'Visual analysis failed', tone: 'warning', security: false },
   CITATIONS_REMOVED: { title: 'Invalid citations removed', tone: 'warning', security: false },
   CONTENT_TRUNCATED: { title: 'Content shortened', tone: 'warning', security: false },
+  INCIDENT_EXTRACTION_FAILED: {
+    title: 'Incident facts not extracted',
+    tone: 'warning',
+    security: false,
+  },
 };
 
 export const ENTITY_GROUPS: { type: EntityType; label: string }[] = [
@@ -75,3 +89,55 @@ export function formatBytes(bytes: number): string {
 export function plural(count: number, word: string, pluralWord = `${word}s`): string {
   return `${count} ${count === 1 ? word : pluralWord}`;
 }
+
+// ---------------------------------------------------------------- incident profile
+
+/** Fact rows, in display order. Labels match the backend's FIELD_LABELS (claims, checks). */
+export const FACT_FIELDS: { field: FactField; label: string }[] = [
+  { field: 'traffic_light', label: 'Traffic light' },
+  { field: 'vehicle_count', label: 'Number of vehicles' },
+  { field: 'weather', label: 'Weather' },
+  { field: 'road_surface', label: 'Road surface' },
+  { field: 'lighting', label: 'Lighting' },
+  { field: 'injuries', label: 'Injuries' },
+  { field: 'party_left_scene', label: 'A party left the scene' },
+];
+
+const VALUE_LABEL: Record<string, string> = {
+  '4_or_more': '4 or more',
+  not_working: 'not working',
+  night_street_lit: 'night, street lights on',
+  night_dark: 'night, dark',
+  dusk_or_dawn: 'dusk or dawn',
+  serious_or_fatal: 'serious or fatal',
+  injury: 'injury reported',
+  none_visible: 'none visible',
+  not_visible: 'not visible',
+  left_side: 'left side',
+  right_side: 'right side',
+  road_traffic: 'Road traffic',
+  public_disturbance: 'Public disturbance',
+};
+
+/** Readable form of a closed-list value from the incident schemas. */
+export function valueLabel(value: string): string {
+  return VALUE_LABEL[value] ?? value.replace(/_/g, ' ');
+}
+
+export const CORROBORATION: Record<
+  IncidentClaim['corroboration'],
+  { label: string; tone: Tone; icon: 'check' | 'cross' | 'info' }
+> = {
+  supported: { label: 'Matches photo', tone: 'success', icon: 'check' },
+  contradicted: { label: 'Contradicts photo', tone: 'danger', icon: 'cross' },
+  not_verifiable: { label: 'Not checkable', tone: 'neutral', icon: 'info' },
+};
+
+export const CHECK_RESULT: Record<
+  ConsistencyCheck['result'],
+  { label: string; tone: Tone; icon: 'check' | 'cross' | 'info' }
+> = {
+  consistent: { label: 'Consistent', tone: 'success', icon: 'check' },
+  inconsistent: { label: 'Inconsistent', tone: 'danger', icon: 'cross' },
+  unclear: { label: 'Unclear', tone: 'neutral', icon: 'info' },
+};

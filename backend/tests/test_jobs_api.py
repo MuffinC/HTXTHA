@@ -78,11 +78,11 @@ async def test_upload_poll_results_end_to_end(client: httpx.AsyncClient) -> None
     assert job["consolidated_error"] is None
 
 
-async def test_profiles_lists_general_as_available(client: httpx.AsyncClient) -> None:
+async def test_profiles_lists_general_and_incident_as_available(client: httpx.AsyncClient) -> None:
     profiles = (await client.get("/api/profiles")).json()
     assert {p["id"]: p["available"] for p in profiles} == {
         "general": True,
-        "incident": False,
+        "incident": True,
         "statistical": False,
     }
     assert all(p["description"] for p in profiles)
@@ -158,7 +158,9 @@ async def test_request_over_total_limit_is_refused_before_parsing(make_settings:
 
 
 async def test_unavailable_profile_returns_400(client: httpx.AsyncClient) -> None:
-    response = await _upload(client, [("a.pdf", pdf_factory.valid_text_pdf())], profile="incident")
+    response = await _upload(
+        client, [("a.pdf", pdf_factory.valid_text_pdf())], profile="statistical"
+    )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "UNSUPPORTED_PROFILE"
 
@@ -334,5 +336,6 @@ async def test_mock_delay_slows_calls_and_mock_fail_fails_analysis() -> None:
     )
     started = time.perf_counter()
     result = await MockProvider(delay_seconds=0.05).complete(request)
-    assert time.perf_counter() - started >= 0.05
+    # Tolerance: Windows timers can wake a few ms early.
+    assert time.perf_counter() - started >= 0.04
     assert result.text == "{}"  # invalid for the schema: drives the real failure path

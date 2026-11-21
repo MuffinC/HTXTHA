@@ -19,6 +19,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.incident import SceneObservation
+
 VisualType = Literal["photo", "chart", "table", "diagram", "map", "scanned_text"]
 
 # Categories only. The model reports THAT a licence plate is visible, never the
@@ -81,6 +83,13 @@ class VisualElementModelOutput(BaseModel):
     sensitive_content: SensitiveContent = Field(default_factory=SensitiveContent)
 
 
+class IncidentVisualElementModelOutput(VisualElementModelOutput):
+    """Incident profile: the scene fields are REQUIRED, so the model must answer each one
+    (with "unclear" where it cannot tell). Kept only for photos when mapped."""
+
+    scene: SceneObservation
+
+
 class VisualPageModelOutput(BaseModel):
     """The model's answer for one rendered page.
 
@@ -105,6 +114,12 @@ class VisualPageModelOutput(BaseModel):
     )
 
 
+class IncidentVisualPageModelOutput(VisualPageModelOutput):
+    """Incident-profile page output: elements carry required scene fields."""
+
+    elements: list[IncidentVisualElementModelOutput] = Field(default_factory=list)
+
+
 # --------------------------------------------------------------------------- API output
 
 
@@ -121,4 +136,6 @@ class VisualElement(BaseModel):
     chart: ChartDetails | None = None
     transcription: str | None = None
     sensitive_content: SensitiveContent = Field(default_factory=SensitiveContent)
+    # Incident profile, photos only: the structured scene (an addition to the spec, D-057).
+    scene: SceneObservation | None = None
     ai_generated: Literal[True] = True
