@@ -58,6 +58,36 @@ function DocStepper({ doc }: { doc: DocumentResult }) {
   );
 }
 
+/** Files rejected at upload, collapsed by default when there are more than two. */
+function RejectedGroup({ docs }: { docs: DocumentResult[] }) {
+  const [open, setOpen] = useState(docs.length <= 2);
+  return (
+    <details
+      className="rejected-group"
+      open={open}
+      onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+    >
+      <summary>
+        <Icon name="cross" />
+        {plural(docs.length, 'file')} rejected at upload
+      </summary>
+      <ul>
+        {docs.map((doc) => (
+          <li key={doc.document_id}>
+            <span className="file-name" title={doc.filename}>
+              {doc.filename}
+            </span>
+            <span className="file-problem">
+              <strong>{REJECTION_LABEL[doc.error?.code ?? ''] ?? 'Rejected'}.</strong>{' '}
+              {doc.error?.message}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function useElapsed(since: string, running: boolean): string {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -92,6 +122,7 @@ export function JobProgress({
   const status = JOB_STATUS_TEXT[job.status];
   const message = announcement(job);
   const processed = job.documents.filter((d) => d.status !== 'rejected');
+  const rejected = job.documents.filter((d) => d.status === 'rejected');
   const done = processed.filter((d) => d.status === 'completed').length;
 
   return (
@@ -111,7 +142,7 @@ export function JobProgress({
       </p>
 
       <ul className="doc-progress">
-        {job.documents.map((doc) => (
+        {processed.map((doc) => (
           <li key={doc.document_id}>
             <div className="doc-progress-head">
               <span className="doc-label">{docs.byId.get(doc.document_id)?.label ?? '—'}</span>
@@ -128,6 +159,8 @@ export function JobProgress({
           </li>
         ))}
       </ul>
+
+      {rejected.length > 0 && <RejectedGroup docs={rejected} />}
 
       {!running && (
         <button type="button" className="button-secondary" onClick={onNew}>

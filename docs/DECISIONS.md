@@ -277,7 +277,8 @@ fail.
   posture for a demo and a shared screen. An agency deployment with access controls may
   reasonably turn it off. With masking off, an NRIC that the model transcribes against
   instructions is shown as written.
-- **Where applied:** stage 2 visual output now. Stage 3 and 4 outputs from M3.
+- **Where applied:** stage 2 visual output, and stage 3 and 4 outputs (from M3). Identifiers are
+  never masked (D-053).
 - **Milestone:** M2
 
 ## D-022 Provider is a thin transport; parsing and validation are shared
@@ -836,6 +837,117 @@ fail.
 - Model output is plain text everywhere (`ModelText`). PII masks render as grey pills and the
   mock's `[MOCK]` prefix as a small tag, so neither reads as document text.
 - **Milestone:** M4
+
+## D-052 Container images: pinned bases, non-root, healthchecks, static-only frontend
+
+- **Pinned base images:** `python:3.12.16-slim-bookworm`,
+  `node:24.22.3-bookworm-slim` (build stage only; the same Node as development, D-001),
+  `nginxinc/nginx-unprivileged:1.31.7-alpine` and `ollama/ollama:0.40.16`. The Ollama image is
+  the exact version the benchmarks and live tests used (D-023).
+- **Non-root:** the backend runs as uid 10001 (`app`), with `/data` owned by it. The frontend
+  uses the nginx-unprivileged image: uid 101, port 8080, no root and no port 80. Verified with
+  `id` inside both running containers.
+- **Healthchecks:** the backend probes `GET /api/health`, which returns 200 whenever the API is
+  up, so a model that is still downloading does not mark the container unhealthy. The frontend
+  probes nginx `GET /healthz`.
+- **Small frontend image:** a multi-stage build, so the final image holds only `dist/` and
+  nginx (92.9 MB as Docker Desktop reports it, of which about 1 MB is the app). There is no
+  Node, `node_modules` or source. The backend image is 672 MB, mostly PyMuPDF and Python.
+- **nginx as a template:** `nginx.conf` is rendered at start-up by the image's envsubst
+  entrypoint, so `BACKEND_URL` and `NGINX_CLIENT_MAX_BODY_SIZE` come from compose.
+  - `client_max_body_size` defaults to `260m` (at least 10 files × 25 MB plus multipart
+    overhead). nginx's 1 MB default would break uploads; verified with a 5.6 MB upload through
+    nginx (HTTP 202). The backend still enforces the real limits with its error envelope.
+  - The app is served with a strict same-origin Content-Security-Policy, `X-Frame-Options:
+    DENY`, `nosniff` and `no-referrer`. Fonts are bundled, so `font-src 'self'` is enough.
+  - `/api/` (including `/api/docs`) is proxied without the CSP, because Swagger UI loads its
+    assets from a CDN (L-009).
+- **Milestone:** M5
+
+## D-053 PII masking corrupted a document ID (fixed)
+
+- **Found:** the M5 screenshots showed a "?" document chip in the consolidated report. The
+  consolidation stage masked the *final* report, including citation `document_id`s. The UUID
+  `a75d14ec-…-cb96609844e7` contains `96609844`, which matches the Singapore phone pattern, so
+  the ID became `…cb[PHONE REDACTED]e7` and no longer matched its document. The bug had been there
+  since M3; most UUIDs never contain such a run, so earlier runs did not show it.
+- **Fixes, two layers:**
+  1. Consolidation now masks the model output while documents are still `D1`/`D2` labels,
+     *before* they are mapped to UUIDs, so identifiers are never masked.
+  2. The phone patterns now need a non-alphanumeric boundary on both sides
+     (`(?<![\w+])…(?!\w)`). A digit run inside a word, identifier or hex string is not a phone
+     number.
+- **Regression tests:** `test_pii.py` (the UUID and `ab91234567cd` are untouched) and
+  `test_consolidation.py::test_masking_never_touches_document_ids`.
+- **Milestone:** M5
+
+## D-054 Compose layout: normal, standalone mock, GPU override
+
+- `docker-compose.yml`: `ollama` (flash attention and q8_0 KV cache, D-023; a named volume for
+  models; healthcheck `ollama list`), the one-shot `ollama-init` (`ollama pull $OLLAMA_MODEL`,
+  then exits), `backend` (waits for Ollama to be healthy, not for the download; the UI shows
+  "model not ready" until the pull finishes) and `frontend`.
+  - **Ollama's port is not published:** only the backend talks to it, over the compose
+    network, so it cannot clash with a native Ollama on 11434.
+  - **The frontend binds to `127.0.0.1:8080` only:** a single-analyst local tool (A-001)
+    should not be reachable from the LAN by default. `FRONTEND_PORT` changes the port.
+- `docker-compose.mock.yml` is a **standalone** file, not an override. Compose overrides cannot
+  remove services or `depends_on` entries, so an override would still define and start Ollama.
+  It has no Ollama and no GPU. It uses its own project name (`htx-document-analyst-mock`) and
+  volume, so mock jobs never show up in a real deployment's database.
+- `docker-compose.gpu.yml` adds the NVIDIA device reservation to `ollama`.
+- **Verified on the author's machine** (Windows 10, Docker Desktop 29.2.0 on WSL 2,
+  RTX 3070 8 GB):
+
+  | Step | Command | Time |
+  |---|---|---|
+  | Mock: build both images from scratch (`--no-cache --pull`) | `docker compose -f docker-compose.mock.yml build --no-cache --pull` | 133 s |
+  | Mock: start until both containers are healthy | `docker compose -f docker-compose.mock.yml up -d --wait` | 18 s |
+  | Mock: smoke test, 2 PDFs through nginx | `bash scripts/smoke_test.sh http://127.0.0.1:8080 120` | job completed in 2 s |
+  | GPU: start the stack (images already built) | `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d` | 15 s |
+  | GPU: first-run model download (`ollama-init`, ~3.3 GB) | (automatic) | 119 s |
+  | GPU: smoke test, 2 PDFs, real model, cold | `bash scripts/smoke_test.sh http://127.0.0.1:8080 600` | 33 s |
+  | GPU: synthetic incident pair (3 pages, 1 photo), warm | upload via `/api/jobs` | 43 s (native Ollama: 45.8 s) |
+
+  Inside the container, `ollama ps` showed `qwen3-vl:4b-instruct  4.4 GB  100% GPU  16384`. The
+  Ollama log confirmed `OLLAMA_FLASH_ATTENTION:true`, `OLLAMA_KV_CACHE_TYPE:q8_0` and CUDA on
+  the RTX 3070. Docker adds no measurable overhead over native Ollama.
+- **Milestone:** M5
+
+## D-055 CI workflow
+
+- **backend:** Python 3.12, `pip install -r backend/requirements-dev.txt`, ruff check and format
+  check on `backend/` and `scripts/`, `pytest` (mock provider; live tests are deselected by
+  default), then a fixture drift step. `test_frontend_fixtures.py` fails on any difference, and
+  `git diff`/`git status` on `frontend/src/test/fixtures` also catches a fixture that was
+  missing and got written during the run.
+- **frontend:** Node from `.nvmrc` (24), `npm ci`, lint, typecheck, `vitest run`, build.
+- **docker** (after both pass): build both images, start the mock compose with
+  `up -d --wait`, then run `scripts/smoke_test.sh` through nginx:
+  - the index page, `/api/health`, `/api/docs` and `/api/openapi.json`;
+  - an upload of `vector_chart.pdf` and `prompt_injection.pdf`, polled until `completed` with a
+    consolidated report;
+  - an all-invalid upload, which must return 400.
+
+  Logs are dumped on failure, and `down -v` always runs.
+- `concurrency` cancels superseded runs on the same branch, and `permissions: contents: read`.
+- **Milestone:** M5
+
+## D-056 UI polish after the M4 review
+
+- **AI labelling:** one notice above the results ("All analysis below is AI-generated by a local
+  model. Verify it against the cited pages.") replaces the per-section badges, which repeated
+  on every heading. The per-item badge stays only on visual element cards, the most
+  interpretive output.
+- **Tab bar:** the bottom rule is now an inset shadow, and tabs no longer overlap it with a
+  negative margin, so the horizontally scrollable bar never grows a vertical scrollbar.
+- **Rejected files:** grouped under "N files rejected at upload" in the job panel, collapsed by
+  default when there are more than two.
+- **Consolidated tab:** with fewer than two analysed documents it is shown struck through and
+  `aria-disabled`, with the reason as its tooltip. Arrow keys skip it.
+- **Spinner:** now a faint full ring with a rotating arc. Before, it was a bare arc that read
+  as ")".
+- **Milestone:** M5 (review of M4)
 
 ---
 

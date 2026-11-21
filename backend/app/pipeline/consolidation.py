@@ -89,13 +89,17 @@ async def consolidate(
         provider, request, ConsolidatedModelOutput, retries=CONSOLIDATION_RETRIES
     )
 
+    # Mask while documents are still short labels (D1, D2), BEFORE they become
+    # UUIDs: a UUID such as "...-cb96609844e7" contains a phone-like digit run,
+    # and masking it would break the citation (found in M5 screenshots; D-053).
+    if settings.mask_pii:
+        output = ConsolidatedModelOutput.model_validate(mask_pii_in(output.model_dump()))
+
     report, removed = resolve_citations(output, by_label)
     warning = removed_citations_warning(removed, "the consolidated report")
     if warning:
         warnings.append(warning)
     report.warnings = warnings
-    if settings.mask_pii:
-        report = ConsolidatedReport.model_validate(mask_pii_in(report.model_dump()))
     return report
 
 

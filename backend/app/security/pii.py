@@ -25,10 +25,12 @@ PHONE_MASK = "[PHONE REDACTED]"
 # ASSUMPTION: lower-case NRIC/FIN is also masked (OCR and models do not always keep case).
 _NRIC = re.compile(r"\b[STFGM]\d{7}[A-Z]\b", re.IGNORECASE)
 
-# Lookarounds instead of \b so "+65" at the start still anchors correctly,
-# and digits that are part of a longer number are not partially masked.
-_SG_PHONE = re.compile(r"(?<![\d+])(?:\+?65[\s-]?)?[3689]\d{3}[\s-]?\d{4}(?!\d)")
-_INTL_PHONE = re.compile(r"(?<![\w+])\+\d{1,3}(?:[\s-]?\d){7,12}(?!\d)")
+# Lookarounds instead of \b so "+65" at the start still anchors correctly.
+# Neither side may touch a letter or digit: digits inside a longer number, an
+# identifier or a hex string (e.g. the UUID "...-cb96609844e7") are not phone
+# numbers, and masking them would corrupt the value (DECISIONS D-053).
+_SG_PHONE = re.compile(r"(?<![\w+])(?:\+?65[\s-]?)?[3689]\d{3}[\s-]?\d{4}(?!\w)")
+_INTL_PHONE = re.compile(r"(?<![\w+])\+\d{1,3}(?:[\s-]?\d){7,12}(?!\w)")
 
 
 def mask_pii(text: str) -> str:

@@ -114,3 +114,18 @@ async def test_consolidation_retries_once_then_raises(settings: Settings) -> Non
     with pytest.raises(LLMOutputInvalidError):
         await consolidate(DOCS, provider, settings)
     assert len(provider.calls(LLMTask.CONSOLIDATION)) == 2
+
+
+async def test_masking_never_touches_document_ids(settings: Settings) -> None:
+    # Regression (D-053): this UUID's last segment contains "96609844", which looks
+    # like a Singapore phone number. Masking the final report used to corrupt it.
+    phone_like_id = "a75d14ec-072e-4838-84d5-cb96609844e7"
+    docs = [_analysis(ID_A, 2, "Report A."), _analysis(phone_like_id, 1, "Report B.")]
+    output = _output(
+        overall_summary="Witness phone 9123 4567 is in report B.",
+        related_document_groups=[{"documents": ["D1", "D2"], "reason": "Same event."}],
+    )
+    report = await consolidate(docs, RecordingProvider({LLMTask.CONSOLIDATION: [output]}), settings)
+
+    assert report.related_document_groups[0].document_ids == [ID_A, phone_like_id]
+    assert "9123 4567" not in report.overall_summary  # text is still masked

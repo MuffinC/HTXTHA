@@ -3,7 +3,7 @@
 import type { DocumentAnalysis } from '../api/types';
 import { ENTITY_GROUPS, plural } from '../lib/labels';
 import { CitationChip, Citations } from './Citations';
-import { AiLabel, Section, WarningBanner } from './Common';
+import { Section, WarningBanner } from './Common';
 import { ModelText } from './ModelText';
 import { VisualElementCard } from './VisualElementCard';
 
@@ -23,7 +23,7 @@ export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; 
           </p>
           <h2 className="result-title">{analysis.filename}</h2>
           <p className="muted">
-            <ModelText text={analysis.document_type_guess} /> <AiLabel />
+            <ModelText text={analysis.document_type_guess} />
           </p>
         </div>
         {/* Slot for the triage badge and analyst override (M7). */}
@@ -32,14 +32,14 @@ export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; 
 
       <WarningBanner warnings={analysis.warnings} documentId={id} />
 
-      <Section title="Summary" ai>
+      <Section title="Summary">
         <p className="lead">
           <ModelText text={analysis.summary} />
         </p>
       </Section>
 
       {analysis.main_topics.length > 0 && (
-        <Section title="Topics" ai>
+        <Section title="Topics">
           <p className="chips">
             {analysis.main_topics.map((t, i) => (
               <span key={i} className="chip">
@@ -51,7 +51,7 @@ export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; 
       )}
 
       {groups.length > 0 && (
-        <Section title="Key entities" ai count={analysis.key_entities.length}>
+        <Section title="Key entities" count={analysis.key_entities.length}>
           <dl className="entity-groups">
             {groups.map((g) => (
               <div key={g.type} className="entity-group">
@@ -71,7 +71,7 @@ export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; 
       )}
 
       {analysis.notable_points.length > 0 && (
-        <Section title="Notable points" ai count={analysis.notable_points.length}>
+        <Section title="Notable points" count={analysis.notable_points.length}>
           <ul className="points">
             {analysis.notable_points.map((p, i) => (
               <li key={i}>

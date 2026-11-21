@@ -145,7 +145,9 @@ describe('results from a completed job', () => {
     expect(screen.getByRole('heading', { name: 'report_a.pdf' })).toBeInTheDocument();
     expect(window.location.search).toContain(`tab=${jobCompleted.documents[0]!.document_id}`);
     expect(screen.getByText('Locations')).toBeInTheDocument();
-    expect(screen.getAllByText('AI-generated').length).toBeGreaterThan(1);
+    // One notice for the whole results area; per-item badges only on visual cards.
+    expect(screen.getByRole('note')).toHaveTextContent('All analysis below is AI-generated');
+    expect(screen.getAllByText('AI-generated')).toHaveLength(1);
     expect(screen.getByText('Photo')).toBeInTheDocument();
     expect(screen.getByText(/Visible personal information/)).toHaveTextContent('licence plate');
 
@@ -189,6 +191,23 @@ describe('results from a completed job', () => {
   });
 });
 
+describe('job panel', () => {
+  it('collapses rejected files when there are more than two', async () => {
+    const job = clone(jobPartial);
+    const rejected = job.documents[2]!;
+    job.documents.push(
+      { ...rejected, document_id: 'r2', filename: 'second.pdf' },
+      { ...rejected, document_id: 'r3', filename: 'third.pdf' },
+    );
+    mockApi({ jobs: { [job.job_id]: job } });
+    setUrl({ job: job.job_id });
+    render(<App />);
+
+    const summary = await screen.findByText('3 files rejected at upload');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
+  });
+});
+
 describe('progress, partial and failed jobs', () => {
   it('polls until the job finishes and announces progress', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -217,7 +236,12 @@ describe('progress, partial and failed jobs', () => {
     expect(screen.getByText(/broken_analysis.pdf/, { selector: 'strong' }).parentElement).toHaveTextContent(
       'even after one retry',
     );
-    expect(screen.getByText(/1 file rejected at upload/)).toBeInTheDocument();
+    expect(screen.getByText(/one file was rejected/)).toBeInTheDocument();
+    expect(screen.getByText('1 file rejected at upload')).toBeInTheDocument(); // job panel group
+    // Fewer than two analysed documents: the consolidated tab is shown but unavailable.
+    const consolidated = screen.getByRole('tab', { name: /Consolidated report/ });
+    expect(consolidated).toHaveAttribute('aria-disabled', 'true');
+    expect(consolidated).toHaveAttribute('title', expect.stringContaining('at least two'));
     expect(screen.getByText('Not a PDF.')).toBeInTheDocument(); // rejected file in the job panel
     // The successful document is still fully available.
     expect(screen.getByRole('heading', { name: 'report_a.pdf' })).toBeInTheDocument();

@@ -103,7 +103,21 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 
 ## CI / Docker
 
-- _(added in M5)_
+- A-301: Docker with Compose v2.24 or later. The GPU stack needs an NVIDIA GPU with GPU support
+  in Docker: Docker Desktop on WSL 2 for Windows, or the NVIDIA Container Toolkit on Linux.
+  Without a GPU, `docker compose up` runs Ollama on the CPU, which works but is much slower
+  than the timings in DECISIONS D-023. Use the mock compose on machines without a GPU.
+- A-302: Quit any native Ollama before starting the GPU stack. On an 8 GB card the two cannot
+  both hold the model in VRAM. On Windows, the `ollama` CLI starts the Ollama tray app if it is
+  not running, so use `docker compose ... exec ollama ollama ps` instead while the stack is up.
+- A-303: The first start of the full stack downloads the model again (about 3.3 GB, roughly
+  2 minutes on the author's connection) into the `ollama-models` Docker volume, even if a native
+  Ollama already has it; the two stores are separate. `docker compose down` keeps the volume;
+  `down -v` deletes it.
+- A-304: The UI is served on `127.0.0.1:8080` only (loopback). Exposing it on a network would
+  need authentication, which is out of scope (A-001).
+- A-305: `NGINX_CLIENT_MAX_BODY_SIZE` (default `260m`) must stay at least
+  `MAX_FILES x MAX_FILE_MB` plus about 1 MB. Raise it together with those two limits.
 
 ## Known limitations
 
@@ -147,3 +161,9 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - L-008: Jobs run one at a time from an in-memory queue. A large upload delays everything
   queued behind it, and a restart loses queued work (A-117). Acceptable for one analyst; a
   multi-user deployment would need a persistent queue.
+- L-009: `/api/docs` (Swagger UI) loads its JavaScript and CSS from a public CDN by default (a
+  FastAPI default), so the API docs page does not render on an offline machine. The app itself
+  is unaffected: its fonts and assets are bundled, and `/api/openapi.json` works offline.
+  Self-hosting the Swagger assets would fix this.
+- L-010: The `ollama/ollama` image runs as root inside its container (a third-party image). Its
+  port is not published and only the backend can reach it.

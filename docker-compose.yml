@@ -1,0 +1,94 @@
+# HTX Document Analyst: full stack with the local model (Ollama).
+#
+#   docker compose up --build                                        # CPU (slow)
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build   # NVIDIA GPU
+#   docker compose -f docker-compose.mock.yml up --build             # no model at all
+#
+# Then open http://127.0.0.1:8080. API docs: http://127.0.0.1:8080/api/docs
+#
+# Notes:
+# * The first start downloads the model into a Docker volume (~3.3 GB for the
+#   default), even if it is already pulled in a native Ollama; the two stores are separate.
+# * Ollama's port is not published, so it cannot clash with a native Ollama on 11434.
+#   For the GPU stack, quit a native Ollama first: on an 8 GB card both would need VRAM.
+# * Every setting has a default here; override any of them in a .env file next to this one.
+
+name: htx-document-analyst
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.16
+    environment:
+      # Fit the 16k context into 8 GB of VRAM at full speed (DECISIONS D-023).
+      OLLAMA_FLASH_ATTENTION: "1"
+      OLLAMA_KV_CACHE_TYPE: q8_0
+      OLLAMA_KEEP_ALIVE: 15m
+    volumes:
+      - ollama-models:/root/.ollama
+    # No "ports:" on purpose: only the backend talks to Ollama, over the compose network.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  # One-shot: pull the model into the volume, then exit. Re-running is a no-op
+  # once the model is present (Ollama checks the digest).
+  ollama-init:
+    image: ollama/ollama:0.40.16
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-qwen3-vl:4b-instruct}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build: ./backend
+    image: htx-document-analyst-backend:local
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3-vl:4b-instruct}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-16384}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-300}
+      MAX_FILES: ${MAX_FILES:-10}
+      MAX_FILE_MB: ${MAX_FILE_MB:-25}
+      MAX_PAGES: ${MAX_PAGES:-60}
+      MAX_VISUAL_PAGES_PER_DOC: ${MAX_VISUAL_PAGES_PER_DOC:-20}
+      RENDER_DPI: ${RENDER_DPI:-150}
+      ACTIVE_CONTENT_POLICY: ${ACTIVE_CONTENT_POLICY:-reject}
+      MASK_PII: ${MASK_PII:-true}
+      RETAIN_UPLOADS: ${RETAIN_UPLOADS:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATA_DIR: /data
+    volumes:
+      - app-data:/data
+    depends_on:
+      # Wait for the Ollama server, not for the model download: the UI shows
+      # "model not ready" until ollama-init has finished pulling.
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: htx-document-analyst-frontend:local
+    environment:
+      BACKEND_URL: http://backend:8000
+      # >= MAX_FILES x MAX_FILE_MB + ~1 MB multipart overhead (nginx's default is 1 MB).
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-260m}
+    ports:
+      # Loopback only: the app is for the analyst on this machine (ASSUMPTIONS A-001).
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ollama-models:
+  app-data:

@@ -5,7 +5,7 @@ import type { Citation, JobResponse } from '../api/types';
 import { WARNING_INFO, plural } from '../lib/labels';
 import { CitationContext, type JobDocs } from '../lib/citations';
 import { PageDrawer } from './Citations';
-import { Notice } from './Common';
+import { AiNotice, Notice } from './Common';
 import { ConsolidatedMissing, ConsolidatedView } from './ConsolidatedView';
 import { DocumentView } from './DocumentView';
 import { Icon } from './Icon';
@@ -78,7 +78,10 @@ function OutcomeBanner({ job }: { job: JobResponse }) {
           <p>{job.consolidated_error?.message}</p>
         )}
         {rejected.length > 0 && (
-          <p className="muted small">{plural(rejected.length, 'file')} rejected at upload (see the job panel).</p>
+          <p className="muted small">
+            Also, {rejected.length === 1 ? 'one file was' : `${rejected.length} files were`} rejected
+            at upload (listed in the job panel).
+          </p>
         )}
       </Notice>
     );
@@ -104,15 +107,29 @@ export function ResultsArea({
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const completed = job.documents.filter((d) => d.status === 'completed' && d.analysis);
-  const processedCount = [...docs.byId.values()].length;
   const running = job.status === 'queued' || job.status === 'processing';
   // The consolidated tab appears once there is something to look at: a finished
-  // document, or a finished job (whose tab then explains any missing report).
-  const showConsolidated =
-    (processedCount > 1 || job.consolidated !== null) && (completed.length > 0 || !running);
+  // document, or a finished job. With fewer than two analysed documents it is
+  // shown as unavailable, with the reason as its tooltip.
+  const showConsolidated = completed.length > 0 || !running;
+  const consolidatedUnavailable =
+    !running && job.consolidated === null && completed.length < 2
+      ? (job.consolidated_error?.message ??
+        'A consolidated report needs at least two successfully analysed documents.')
+      : null;
 
   const tabs = [
-    ...(showConsolidated ? [{ id: CONSOLIDATED_TAB, label: 'Consolidated report', warnings: 0, security: false }] : []),
+    ...(showConsolidated
+      ? [
+          {
+            id: CONSOLIDATED_TAB,
+            label: 'Consolidated report',
+            warnings: 0,
+            security: false,
+            unavailable: consolidatedUnavailable,
+          },
+        ]
+      : []),
     ...completed.map((d) => {
       const warnings = d.analysis?.warnings ?? [];
       return {
@@ -120,18 +137,26 @@ export function ResultsArea({
         label: `${docs.byId.get(d.document_id)?.label} ${d.filename}`,
         warnings: warnings.length,
         security: warnings.some((w) => WARNING_INFO[w.code].security),
+        unavailable: null as string | null,
       };
     }),
   ];
+  const selectable = tabs.filter((t) => !t.unavailable);
 
-  const defaultTab = job.consolidated ? CONSOLIDATED_TAB : (completed[0]?.document_id ?? tabs[0]?.id);
-  const active = tabs.some((t) => t.id === tab) ? tab : defaultTab;
+  const defaultTab = job.consolidated
+    ? CONSOLIDATED_TAB
+    : (completed[0]?.document_id ?? selectable[0]?.id);
+  const active = selectable.some((t) => t.id === tab) ? tab : defaultTab;
   const activeDoc = completed.find((d) => d.document_id === active);
 
   const onKeyDown = (event: KeyboardEvent, index: number) => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
     if (!delta) return;
-    const next = (index + delta + tabs.length) % tabs.length;
+    // Arrow keys skip unavailable tabs.
+    let next = index;
+    do {
+      next = (next + delta + tabs.length) % tabs.length;
+    } while (tabs[next]!.unavailable && next !== index);
     onTab(tabs[next]!.id);
     tabRefs.current[next]?.focus();
   };
@@ -141,6 +166,7 @@ export function ResultsArea({
       <OutcomeBanner job={job} />
       {tabs.length > 0 ? (
         <>
+          <AiNotice />
           <div className="tabs" role="tablist" aria-label="Results">
             {tabs.map((t, i) => (
               <button
@@ -153,12 +179,17 @@ export function ResultsArea({
                 id={`tab-${t.id}`}
                 aria-selected={t.id === active}
                 aria-controls="result-panel"
+                aria-disabled={t.unavailable ? true : undefined}
+                title={t.unavailable ? `Not available: ${t.unavailable}` : undefined}
                 tabIndex={t.id === active ? 0 : -1}
-                className="tab"
-                onClick={() => onTab(t.id)}
+                className={`tab${t.unavailable ? ' is-unavailable' : ''}`}
+                onClick={() => !t.unavailable && onTab(t.id)}
                 onKeyDown={(e) => onKeyDown(e, i)}
               >
                 <span className="tab-label">{t.label}</span>
+                {t.unavailable && (
+                  <span className="visually-hidden"> (not available: {t.unavailable})</span>
+                )}
                 {t.warnings > 0 && (
                   <span className={`tab-warn tone-${t.security ? 'danger' : 'warning'}`} title={plural(t.warnings, 'warning')}>
                     <Icon name={t.security ? 'shield' : 'alert'} />

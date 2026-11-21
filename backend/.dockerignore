@@ -1,0 +1,12 @@
+# Only app/ and requirements.txt go into the image.
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+data/
+*.sqlite3
+.env
+environment.yml
+requirements-dev.txt

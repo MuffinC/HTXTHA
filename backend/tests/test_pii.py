@@ -32,6 +32,9 @@ def test_pii_masked(text: str, expected: str) -> None:
         "Serial 123456789012 recorded.",  # longer number: not partially masked
         "Vehicle count: 3, injuries: 0.",
         "A1234567B is not an NRIC prefix.",
+        # Regression (D-053): a UUID whose hex contains a phone-like digit run.
+        "a75d14ec-072e-4838-84d5-cb96609844e7",
+        "ref ab91234567cd",
     ],
 )
 def test_non_pii_untouched(text: str) -> None:

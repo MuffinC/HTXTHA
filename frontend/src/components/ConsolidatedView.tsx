@@ -50,13 +50,13 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
 
       <WarningBanner warnings={report.warnings} />
 
-      <Section title="Overall summary" ai>
+      <Section title="Overall summary">
         <p className="lead">
           <ModelText text={report.overall_summary} />
         </p>
       </Section>
 
-      <Section title="Contradictions" ai count={report.contradictions.length}>
+      <Section title="Contradictions" count={report.contradictions.length}>
         {report.contradictions.length ? (
           <div className="table-wrap">
             <table className="contradictions">
@@ -93,7 +93,7 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
       </Section>
 
       <div className="two-col">
-        <Section title="Agreements" ai count={report.agreements.length}>
+        <Section title="Agreements" count={report.agreements.length}>
           {report.agreements.length ? (
             <ul className="points">
               {report.agreements.map((a, i) => (
@@ -107,7 +107,7 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
             <p className="muted">None found.</p>
           )}
         </Section>
-        <Section title="Common themes" ai count={report.common_themes.length}>
+        <Section title="Common themes" count={report.common_themes.length}>
           {report.common_themes.length ? (
             <ul className="points">
               {report.common_themes.map((t, i) => (
@@ -123,7 +123,7 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
         </Section>
       </div>
 
-      <Section title="Timeline" ai count={report.timeline.length}>
+      <Section title="Timeline" count={report.timeline.length}>
         {report.timeline.length ? (
           <ol className="timeline">
             {report.timeline.map((e, i) => (
@@ -144,7 +144,7 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
       </Section>
 
       <div className="two-col">
-        <Section title="Related documents" ai count={report.related_document_groups.length}>
+        <Section title="Related documents" count={report.related_document_groups.length}>
           {report.related_document_groups.length ? (
             <ul className="points">
               {report.related_document_groups.map((g, i) => (
@@ -160,7 +160,7 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
             <p className="muted">No groups identified.</p>
           )}
         </Section>
-        <Section title="Information gaps" ai count={report.information_gaps.length}>
+        <Section title="Information gaps" count={report.information_gaps.length}>
           {report.information_gaps.length ? (
             <ul className="points">
               {report.information_gaps.map((g, i) => (

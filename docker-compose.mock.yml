@@ -1,0 +1,49 @@
+# HTX Document Analyst: mock mode. No Ollama, no model download, no GPU.
+#
+#   docker compose -f docker-compose.mock.yml up --build
+#   open http://127.0.0.1:8080
+#
+# The mock provider returns deterministic sample output (marked "MOCK") so the
+# whole app can be run, demonstrated and smoke-tested on any machine. This is a
+# standalone file rather than an override of docker-compose.yml, so the Ollama
+# services are not defined at all (an override cannot remove services or
+# dependencies). It uses its own project name and volume, so mock jobs never
+# mix with real ones.
+
+name: htx-document-analyst-mock
+
+services:
+  backend:
+    build: ./backend
+    image: htx-document-analyst-backend:local
+    environment:
+      LLM_PROVIDER: mock
+      # Seconds per mock call; >0 makes progress visible in demos (0 = instant).
+      MOCK_DELAY_SECONDS: ${MOCK_DELAY_SECONDS:-0}
+      MAX_FILES: ${MAX_FILES:-10}
+      MAX_FILE_MB: ${MAX_FILE_MB:-25}
+      MAX_PAGES: ${MAX_PAGES:-60}
+      ACTIVE_CONTENT_POLICY: ${ACTIVE_CONTENT_POLICY:-reject}
+      MASK_PII: ${MASK_PII:-true}
+      RETAIN_UPLOADS: ${RETAIN_UPLOADS:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATA_DIR: /data
+    volumes:
+      - mock-data:/data
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: htx-document-analyst-frontend:local
+    environment:
+      BACKEND_URL: http://backend:8000
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-260m}
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mock-data:
