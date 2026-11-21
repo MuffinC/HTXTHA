@@ -302,3 +302,37 @@ def test_repository_error_info_round_trip(tmp_path: Path) -> None:
     assert job is not None and job.consolidated_error == ErrorInfo(
         code="SINGLE_DOCUMENT", message="m"
     )
+
+
+async def test_config_exposes_upload_limits_from_settings(make_settings: Any) -> None:
+    async with app_client(create_app(make_settings(max_files=3, max_file_mb=7))) as client:
+        body = (await client.get("/api/config")).json()
+    assert body["max_files"] == 3 and body["max_file_mb"] == 7
+    assert set(body) == {
+        "max_files",
+        "max_file_mb",
+        "max_pages",
+        "max_visual_pages_per_doc",
+        "active_content_policy",
+        "mask_pii",
+        "retain_uploads",
+    }  # nothing sensitive (URLs, paths, model internals) leaks
+
+
+async def test_mock_delay_slows_calls_and_mock_fail_fails_analysis() -> None:
+    import time
+
+    from app.llm.base import LLMRequest
+    from app.llm.mock import MockProvider
+
+    request = LLMRequest(
+        task=LLMTask.DOCUMENT_ANALYSIS,
+        system="",
+        prompt="",
+        json_schema={},
+        metadata={"first_sentences": {1: "MOCK_FAIL: break this one."}},
+    )
+    started = time.perf_counter()
+    result = await MockProvider(delay_seconds=0.05).complete(request)
+    assert time.perf_counter() - started >= 0.05
+    assert result.text == "{}"  # invalid for the schema: drives the real failure path

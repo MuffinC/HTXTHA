@@ -8,12 +8,23 @@ returned as JSON *text*, so it goes through the same parsing and validation as
 real model output.
 
 Every mock text starts with "[MOCK]" so it can never be mistaken for real analysis.
+
+Two demo aids, so every UI state can be shown without a model:
+
+* ``MOCK_DELAY_SECONDS`` pauses each call, so progress is visible.
+* A document with ``MOCK_FAIL`` in the first sentence of any page gets invalid output for its
+  analysis (twice, so the one retry fails too), which drives the real
+  ``LLM_OUTPUT_INVALID`` failure path and lets a job end ``partial`` or ``failed``.
 """
 
+import asyncio
 import json
 from typing import Any
 
 from app.llm.base import LLMProvider, LLMRequest, LLMResult, LLMTask
+
+#: Text that makes the mock fail a document's analysis (demo/test aid, mock only).
+MOCK_FAIL = "MOCK_FAIL"
 
 
 class MockProvider(LLMProvider):
@@ -22,8 +33,15 @@ class MockProvider(LLMProvider):
     name = "mock"
     model = "mock"
 
+    def __init__(self, delay_seconds: float = 0) -> None:
+        self._delay = delay_seconds
+
     async def complete(self, request: LLMRequest) -> LLMResult:
         """Return deterministic JSON for the request's task."""
+        if self._delay:
+            await asyncio.sleep(self._delay)
+        if request.task is LLMTask.DOCUMENT_ANALYSIS and _wants_failure(request.metadata):
+            return LLMResult(text="{}", model=self.model, duration_ms=0, done_reason="stop")
         builders = {
             LLMTask.VISUAL_ANALYSIS: _visual_output,
             LLMTask.DOCUMENT_ANALYSIS: _document_output,
@@ -43,6 +61,11 @@ class MockProvider(LLMProvider):
     async def is_ready(self) -> bool:
         """The mock needs no model, so it is always ready."""
         return True
+
+
+def _wants_failure(metadata: dict[str, Any]) -> bool:
+    """True if the first sentence of any page contains the MOCK_FAIL trigger."""
+    return any(MOCK_FAIL in text for text in metadata.get("first_sentences", {}).values())
 
 
 def _visual_output(metadata: dict[str, Any]) -> dict[str, Any]:

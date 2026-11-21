@@ -17,6 +17,15 @@ definitions are in `CLAUDE.md` section 8.
 | `model` | `string` | Configured Ollama model tag, or `"mock"` |
 | `model_ready` | `boolean` | Ollama is reachable and lists the model (always `true` in mock mode) |
 
+### `GET /api/config` → `ConfigResponse` — `app/api/config.py`
+
+Display-safe settings the frontend needs (DECISIONS D-045): `max_files`, `max_file_mb`,
+`max_pages`, `max_visual_pages_per_doc`, `active_content_policy` (`reject` | `warn`), `mask_pii`
+and `retain_uploads`.
+
+**TypeScript mirror:** `frontend/src/api/types.ts` mirrors every schema on this page. It is
+checked against real API output by the typed fixtures in `frontend/src/test/fixtures/` (D-046).
+
 ### Error envelope (every API error) — `app/schemas/errors.py`
 
 ```json

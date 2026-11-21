@@ -40,6 +40,7 @@ class RecordingProvider(MockProvider):
     """
 
     def __init__(self, overrides: dict[LLMTask, list[str | Exception]] | None = None) -> None:
+        super().__init__()
         self.overrides = {task: list(items) for task, items in (overrides or {}).items()}
         self.requests: list[LLMRequest] = []
 

@@ -89,6 +89,17 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   resolved to IPv6 `::1` first, and because uvicorn listens only on IPv4, proxied requests hung.
   For the same reason, the setup scripts tell users to open `http://127.0.0.1:8000`.
 - A-203: The analyst uses a current evergreen browser (ES2022 support).
+- A-204: The UI is designed for a desktop screen (1280 px or wider; it stacks into one column
+  below about 900 px) and has a light theme only.
+- A-205: One job is shown at a time, the one in the URL. There is no job history list; a
+  previous job can be reopened from its link (`?job=…`) for as long as the backend database
+  keeps it.
+- A-206: Run the frontend tests from a path with an upper-case drive letter on Windows
+  (`C:\…`, as a normal terminal gives). If the working directory is spelled `c:\…`, Vitest 4
+  can load the setup module twice and fail with "failed to find the current suite". This
+  happened in the author's tool session; it is an environment quirk, not a code issue.
+- A-207: The mock-mode helpers `MOCK_DELAY_SECONDS` and `MOCK_FAIL` (DECISIONS D-050) affect
+  only the mock provider. They exist for demos, screenshots and fixtures.
 
 ## CI / Docker
 

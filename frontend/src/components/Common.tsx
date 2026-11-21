@@ -1,0 +1,138 @@
+// Small shared building blocks: section wrapper, AI label, notices, warning banner.
+import { useState, type ReactNode } from 'react';
+import type { DocumentWarning } from '../api/types';
+import { WARNING_INFO, plural, type Tone } from '../lib/labels';
+import { CitationChip } from './Citations';
+import { Icon, type IconName } from './Icon';
+
+/** Marks content produced by the local model (CLAUDE.md section 10). */
+export function AiLabel() {
+  return (
+    <span
+      className="ai-label"
+      title="Produced by a local AI model. Verify it against the cited page before relying on it."
+    >
+      AI-generated
+    </span>
+  );
+}
+
+/**
+ * A titled section of results. `ai` adds the AI-generated label. The empty
+ * span is the slot where thumbs up/down feedback goes in M7.
+ */
+export function Section({
+  title,
+  ai = false,
+  count,
+  children,
+}: {
+  title: string;
+  ai?: boolean;
+  count?: number;
+  children: ReactNode;
+}) {
+  return (
+    <section className="section" aria-label={title}>
+      <header className="section-head">
+        <h3>
+          {title}
+          {count !== undefined && <span className="count">{count}</span>}
+        </h3>
+        {ai && <AiLabel />}
+        <span className="slot-feedback" data-slot="feedback" />
+      </header>
+      {children}
+    </section>
+  );
+}
+
+const TONE_ICON: Record<Tone, IconName> = {
+  neutral: 'info',
+  info: 'info',
+  success: 'check',
+  warning: 'alert',
+  danger: 'cross',
+};
+
+/** A banner with an icon and text; colour is never the only signal. */
+export function Notice({
+  tone,
+  title,
+  children,
+  icon,
+  action,
+  role,
+}: {
+  tone: Tone;
+  title: string;
+  children?: ReactNode;
+  icon?: IconName;
+  action?: ReactNode;
+  role?: 'alert' | 'status';
+}) {
+  return (
+    <div className={`notice tone-${tone}`} role={role}>
+      <Icon name={icon ?? TONE_ICON[tone]} />
+      <div className="notice-body">
+        <p className="notice-title">{title}</p>
+        {children && <div className="notice-text">{children}</div>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/** Collapsible list of a document's warnings, security ones first. */
+export function WarningBanner({
+  warnings,
+  documentId,
+}: {
+  warnings: DocumentWarning[];
+  documentId?: string;
+}) {
+  const [open, setOpen] = useState(true);
+  if (!warnings.length) return null;
+  const sorted = [...warnings].sort(
+    (a, b) => Number(WARNING_INFO[b.code].security) - Number(WARNING_INFO[a.code].security),
+  );
+  const security = sorted.some((w) => WARNING_INFO[w.code].security);
+  return (
+    <div className={`warnings tone-${security ? 'danger' : 'warning'}`}>
+      <button
+        type="button"
+        className="warnings-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name={security ? 'shield' : 'alert'} />
+        <span>
+          {plural(warnings.length, 'warning')}
+          {security ? ': includes a security warning' : ''}
+        </span>
+        <span className="warnings-hint">{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open && (
+        <ul className="warnings-list">
+          {sorted.map((w, i) => {
+            const info = WARNING_INFO[w.code];
+            return (
+              <li key={i} className={`tone-${info.tone}`}>
+                <Icon name={info.security ? 'shield' : 'alert'} />
+                <div>
+                  <p className="warning-title">
+                    {info.title}
+                    {w.page !== null && documentId && (
+                      <CitationChip citation={{ document_id: documentId, page: w.page }} />
+                    )}
+                  </p>
+                  <p className="warning-text">{w.message}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}

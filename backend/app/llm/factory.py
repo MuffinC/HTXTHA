@@ -9,5 +9,5 @@ from app.llm.ollama import OllamaProvider
 def build_provider(settings: Settings) -> LLMProvider:
     """Return the provider selected by ``LLM_PROVIDER``."""
     if settings.llm_provider == "mock":
-        return MockProvider()
+        return MockProvider(delay_seconds=settings.mock_delay_seconds)
     return OllamaProvider(settings)

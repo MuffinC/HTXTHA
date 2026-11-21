@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 
 from app import __version__
-from app.api import health, jobs
+from app.api import config, health, jobs
 from app.api.errors import error_response, register_error_handlers
 from app.config import Settings, get_settings
 from app.errors import ErrorCode
@@ -113,6 +113,7 @@ def create_app(settings: Settings | None = None, provider: LLMProvider | None = 
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(jobs.router, prefix=API_PREFIX)
+    app.include_router(config.router, prefix=API_PREFIX)
     return app
 
 

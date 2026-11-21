@@ -214,6 +214,23 @@ def witness_report_pdf() -> bytes:
     return _save(doc)
 
 
+def mock_fail_pdf() -> bytes:
+    """A document the mock provider deliberately fails (``MOCK_FAIL`` trigger).
+
+    Used to produce real ``partial`` and ``failed`` jobs in mock mode for tests,
+    frontend fixtures and screenshots.
+    """
+    doc = _new_doc()
+    _text_page(
+        doc,
+        [
+            "MOCK_FAIL: this document is set up to fail analysis in mock mode.",
+            "It is used to demonstrate partial and failed jobs without a model.",
+        ],
+    )
+    return _save(doc)
+
+
 def scanned_pdf() -> bytes:
     """A 'scanned' page: one full-page image and no text layer."""
     doc = _new_doc()

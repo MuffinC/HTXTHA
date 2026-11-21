@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3-vl:4b-instruct"
     ollama_num_ctx: int = Field(default=16384, gt=0)
     llm_timeout_seconds: float = Field(default=300, gt=0)
+    # Mock provider only: pause per model call so progress is visible in demos and
+    # screenshots (the mock otherwise finishes a job in milliseconds). 0 in tests.
+    mock_delay_seconds: float = Field(default=0, ge=0, le=30)
 
     # ---- Upload limits ----
     max_files: int = Field(default=10, gt=0)

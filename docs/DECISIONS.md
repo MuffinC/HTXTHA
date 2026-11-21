@@ -747,6 +747,96 @@ fail.
   them and M6 must address them structurally.
 - **Milestone:** M3 follow-up
 
+## D-045 `GET /api/config` drives the frontend's upload limits
+
+- **Decision:** the backend exposes `max_files`, `max_file_mb`, `max_pages`,
+  `max_visual_pages_per_doc`, `active_content_policy`, `mask_pii` and `retain_uploads`. The
+  upload panel checks files against these values and shows them ("Up to 10 files · 25 MB and
+  60 pages each"), so changing `.env` changes the UI too. Hard-coded copies could drift.
+- **Display-safe only:** no URLs, paths or model internals. A test asserts the exact key set.
+- Client-side checks are a convenience; the backend re-validates everything. Like the backend,
+  the type check reads the first bytes (`%PDF-`), not the extension.
+- **Milestone:** M4
+
+## D-046 Frontend fixtures are real API responses, written as typed TypeScript modules
+
+- **Decision:** `backend/tests/test_frontend_fixtures.py` runs real jobs through the API in mock
+  mode (completed, partial, failed, plus health, config, profiles and an upload response). It
+  writes each response to `frontend/src/test/fixtures/*.ts` as
+  `const fixture: JobResponse = { …real output… };`.
+  - UUIDs are normalised to fixed IDs in order of appearance, and timestamps to a fixed instant.
+  - The frontend tests render these fixtures.
+- **Why `.ts` and not `.json`:** TypeScript widens string literals in imported JSON
+  (`"completed"` becomes `string`), so JSON fixtures need a cast, and a cast hides mismatches.
+  As typed modules, `tsc` checks real API output against the hand-written types on every build.
+  Verified by breaking the types: removing `'failed'` from `JobStatus`, or dropping a field,
+  fails `tsc` on the fixture.
+- **Snapshot, not overwrite:** the test writes a fixture only if it is missing or
+  `UPDATE_FRONTEND_FIXTURES=1` is set. Otherwise it fails when the API output differs, so an API
+  change cannot silently leave the frontend types behind (this runs in backend CI).
+- **Milestone:** M4
+
+## D-047 Frontend architecture: no state library, URL-held job, plain CSS with tokens
+
+- **State:** the URL (`?job=…&tab=…`) says which job and tab are shown, and the backend is the
+  source of truth for the job. A refresh, the back button or a shared link reloads the same
+  results. A new job adds a history entry; switching tabs replaces it. Four small hooks cover
+  everything (`useHealth`, `useFetchOnce`, `useJob`, `useUrlState`), so there is no Redux or
+  React Query: the app has one polling loop and no client-side cache to keep in sync.
+- **Polling:** the job every 2 s until it reaches a final status (spec). Health every 10 s,
+  or every 3 s while the model is not ready or the backend is down. Network errors keep the last
+  results on screen and back off up to 10 s. The client tells "unreachable" (no connection, or
+  a proxy 502/504) apart from API errors (the envelope).
+- **Styling:** one stylesheet with CSS custom-property tokens. The spec allowed "plain CSS
+  modules or Tailwind"; a single token-based sheet was simpler than either for about fifteen
+  components, and needs no dependency. The look is a dark top bar, white panels with 1 px
+  borders, deep-teal accent `#0F6E74`, and status colours only where they carry meaning.
+- **Results show progressively:** each document's tab appears as soon as that document
+  finishes; the consolidated tab appears once there is something to show.
+- **Milestone:** M4
+
+## D-048 IBM Plex Sans and Plex Mono, bundled locally
+
+- `@fontsource/ibm-plex-sans` and `@fontsource/ibm-plex-mono` (`~5.3.0`, SIL Open Font License)
+  are bundled into the build, so there is no font CDN and the app works offline, in line with
+  principle 1. Weights loaded: sans 400/500/600, mono 400/500, about 25 KB per weight as woff2,
+  latin subset fetched on demand. Mono is used for citations, IDs, document labels and numbers;
+  tabular numerals are on everywhere.
+- **Milestone:** M4
+
+## D-049 Citation chips open a page drawer now; M8 adds the page image
+
+- Every `p.N` chip (`D2 p.1` in the consolidated view) opens a side drawer for that page, listing
+  everything that cites it: warnings, notable points, visual elements (graphic ones stay
+  hidden), entities, and consolidated-report items. M8 adds the rendered page image at the top
+  of the same drawer, so the interaction does not change.
+- The drawer is a modal dialog: focus moves to Close, and Escape or a backdrop click closes it.
+- **Milestone:** M4
+
+## D-050 Mock-mode demo aids: `MOCK_DELAY_SECONDS` and the `MOCK_FAIL` trigger
+
+- **`MOCK_DELAY_SECONDS`** (default 0, max 30) pauses each mock call, so progress is visible in
+  demos and screenshots. The mock otherwise finishes a job in milliseconds.
+- **`MOCK_FAIL`:** a document with `MOCK_FAIL` in the first sentence of any page gets invalid
+  output for its analysis, twice, so the one retry fails too. That drives the real
+  `LLM_OUTPUT_INVALID` path and lets the partial and failed states be demonstrated,
+  fixture-tested and screenshotted without a model. It only affects the mock provider, and
+  `pdf_factory.mock_fail_pdf()` builds such a document.
+- **Milestone:** M4
+
+## D-051 Accessibility basics
+
+- Every status uses an icon *and* text as well as colour: model pill, job status, steppers
+  (with visually hidden "(done)" / "(in progress)" text), warnings, tab warning counts.
+- An `aria-live="polite"` region announces progress ("report_a.pdf: Describing visuals.",
+  "Analysis complete."). The model pill is also a live status.
+- Tabs follow the ARIA tabs pattern: arrow keys move between them, with
+  `aria-selected`/`aria-controls`. Focus rings are visible, and animations respect
+  `prefers-reduced-motion`.
+- Model output is plain text everywhere (`ModelText`). PII masks render as grey pills and the
+  mock's `[MOCK]` prefix as a small tag, so neither reads as document text.
+- **Milestone:** M4
+
 ---
 
 ## Pending decisions (to record when made)
