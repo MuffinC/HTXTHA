@@ -6,8 +6,9 @@ Every model call in the pipeline goes through ``generate_structured``:
 2. Reject truncated output (``done_reason == "length"``).
 3. Parse JSON. If the text is not JSON and reads like a refusal
    ("I'm sorry, I can't..."), raise ``LLMRefusalError``.
-4. Validate with Pydantic. Fields the schema does not define are dropped, so
-   free text outside the schema never reaches the user (CLAUDE.md section 7).
+4. Remove the pipeline's own markers from every string (``app.llm.artefacts``),
+   then validate with Pydantic. Fields the schema does not define are dropped,
+   so free text outside the schema never reaches the user (CLAUDE.md section 7).
 5. Optionally retry with the validation errors in the prompt (stage 3 uses one
    retry, as the spec requires; visual analysis uses none, see DECISIONS D-028).
 """
@@ -19,6 +20,7 @@ from dataclasses import replace
 
 from pydantic import BaseModel, ValidationError
 
+from app.llm.artefacts import strip_markers_in
 from app.llm.base import (
     LLMOutputInvalidError,
     LLMProvider,
@@ -105,7 +107,8 @@ def parse_output[T: BaseModel](result: LLMResult, schema: type[T]) -> T:
             "The model output was not valid JSON.", ["response was not valid JSON"]
         ) from exc
     try:
-        return schema.model_validate(data)
+        # Our own prompt markers never belong in an answer (see app.llm.artefacts).
+        return schema.model_validate(strip_markers_in(data))
     except ValidationError as exc:
         raise LLMOutputInvalidError(
             "The model output did not match the schema.", _summarise(exc)

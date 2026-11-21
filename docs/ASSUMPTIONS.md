@@ -35,8 +35,12 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   that have some content (see DECISIONS D-014).
 - A-110: Lower-case NRIC/FIN values are masked too, because OCR and models do not always keep
   case. (`pii.py`, `# ASSUMPTION:`)
-- A-111: Upload size is checked on the complete bytes in M1. In M3 the upload endpoint will
-  enforce `MAX_FILE_MB` while streaming, so an oversized upload is never fully buffered.
+- A-111: Upload size (M3): a middleware refuses a request whose `Content-Length` exceeds
+  `MAX_FILES x MAX_FILE_MB + 1 MB` before it is parsed (413). Within the limit, Starlette's
+  multipart parser spools each file to a temporary file (in memory up to 1 MB, then on disk)
+  before the route runs. The route then reads each file in 1 MB chunks and stops once it
+  passes `MAX_FILE_MB`, so an oversized file is never held in memory in full, although it
+  does briefly sit in a temporary file. (DECISIONS D-039)
 - A-112: `OLLAMA_BASE_URL` defaults to `http://ollama:11434`, the Docker Compose service name.
   For local development against a natively installed Ollama, set
   `OLLAMA_BASE_URL=http://127.0.0.1:11434` (an env var, or `backend/.env` when running uvicorn
@@ -55,6 +59,26 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - A-114: Stage 2 runs one page at a time (the spec's concurrency of 1). The timings in D-023
   were measured on the author's RTX 3070 8 GB with desktop apps open. Other GPUs, and
   CPU-only machines, will differ a lot.
+- A-115: Only the General profile is accepted in M3. Incident (M6) and statistical (M8) are
+  listed by `GET /api/profiles` with `available: false`, and uploads with them get 400
+  `UNSUPPORTED_PROFILE`.
+- A-116: A job with only one successfully analysed document has no consolidated report
+  (`consolidated_error.code = SINGLE_DOCUMENT`). Files rejected at upload do not make a job
+  `partial`; they are reported in the `POST` response and stored as `rejected` documents.
+  (D-037)
+- A-117: On restart, both queued and processing jobs are failed with `INTERRUPTED`, because
+  the in-memory queue is lost. Jobs are not resumed. (D-038)
+- A-118: Token counts are estimated at 3 characters per token, which is pessimistic for
+  English. Text in scripts that tokenise less efficiently, such as CJK, may use more tokens
+  than estimated and so get closer to `num_ctx`. (`budget.py`, D-036)
+- A-119: The `--- Page N ---` headings sit inside the untrusted block, so a document could
+  forge one to misattribute text to another real page. Page numbers are still range-checked
+  (D-034), so the worst case is a wrong but existing page, which the analyst can check.
+- A-120: Running headers and footers are only detected on documents with two or more
+  pages: a one-page document has nothing to compare against, so its footer stays in the
+  text (in the live scorecard, report B's "SYNTHETIC SAMPLE" footer still became an
+  entity). A header or footer outside the top or bottom 8% of the page is not detected.
+  (D-043)
 
 ## Frontend
 
@@ -93,7 +117,22 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - L-005: Per-page timings are only usable on a GPU that holds the whole model. With the
   defaults (no flash attention or q8 KV cache) on an 8 GB card, pages took 17–300 s instead
   of 3–4 s (D-023). In mock mode there is no model at all.
-- L-006: Visual output quality is that of a 4B model at Q4. It reads simple charts and
-  describes clear photos reasonably, but can misread small values, miscount objects, or
-  miss fine details. All visual output is labelled AI-generated and is meant to be checked
-  against the page (page previews arrive in M8).
+- L-006: Visual output quality is that of a 4B model at Q4. With the gridline rule (D-031) it
+  read the test chart 6 of 6 within 10%. Photo descriptions are accurate but sparse: on the
+  test photo it left out lighting, weather and road surface, although daylight and a dry road
+  are visible, and gave no inferences. A prompt asking for those details made it state
+  cause as fact, so that prompt was reverted (D-031). It can also misread small values or
+  miscount objects. All visual output is labelled AI-generated and is meant to be checked
+  against the page (page previews arrive in M8). A larger model would likely do better
+  (untested).
+- L-007: Consolidated-report quality with the 4B model, measured by the live contradiction
+  scorecard over 6–7 runs (DECISIONS D-042). It reliably finds the time and weather
+  contradictions, finds the vehicle count about half the time, and almost never finds the
+  traffic-light colour (1 of 14 runs). It sometimes calls the two reports separate
+  incidents and sometimes lists a contradiction where one document is simply silent. Results
+  vary from run to run. Marker entities and date arithmetic were fixed deterministically or
+  by prompt (D-043, D-044). The incident profile (M6) is measured against this baseline.
+  Until then, the consolidated report is a starting point for the analyst, not a finding.
+- L-008: Jobs run one at a time from an in-memory queue. A large upload delays everything
+  queued behind it, and a restart loses queued work (A-117). Acceptable for one analyst; a
+  multi-user deployment would need a persistent queue.

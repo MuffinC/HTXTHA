@@ -101,6 +101,11 @@ def table_pdf() -> bytes:
     return _save(doc)
 
 
+# True bar values of vector_chart_pdf(). The y axis is labelled 0-100 in steps of 25,
+# so Apr (110) sits above the top labelled gridline. Live tests score the model's reading.
+VECTOR_CHART_VALUES = {"Jan": 40, "Feb": 75, "Mar": 55, "Apr": 110, "May": 90, "Jun": 65}
+
+
 def vector_chart_pdf() -> bytes:
     """A page whose only visual is a bar chart drawn with vector paths.
 
@@ -123,10 +128,8 @@ def vector_chart_pdf() -> bytes:
             page.draw_line((left, y), (right, y), color=(0.8, 0.8, 0.8), width=0.5)
         page.insert_text((left - 28, y + 3), str(value), fontsize=8)
     # Bars + x-axis labels
-    values = [40, 75, 55, 110, 90, 65]
-    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
     bar_w, gap = 40, 24
-    for i, (v, label) in enumerate(zip(values, months, strict=True)):
+    for i, (label, v) in enumerate(VECTOR_CHART_VALUES.items()):
         x = left + gap + i * (bar_w + gap)
         bar = pymupdf.Rect(x, bottom - v * 2.4, x + bar_w, bottom)
         page.draw_rect(bar, color=None, fill=(0.2, 0.4, 0.7))
@@ -167,6 +170,47 @@ def real_photo_pdf() -> bytes:
     )
     # 1024 x 768 photo, scaled to the text width (about 483 x 362 pt).
     page.insert_image(pymupdf.Rect(56, 130, A4.width - 56, 492), filename=str(REAL_PHOTO))
+    return _save(doc)
+
+
+def long_text_pdf(pages: int, sentences_per_page: int = 20) -> bytes:
+    """A text-only document long enough to exceed a small context budget (map-reduce)."""
+    doc = _new_doc()
+    for n in range(1, pages + 1):
+        sentences = [
+            f"Page {n}, finding {i}: the review recorded item {n * 100 + i} as complete."
+            for i in range(1, sentences_per_page + 1)
+        ]
+        _text_page(doc, [f"Section {n}", " ".join(sentences)])
+    return _save(doc)
+
+
+# A second account of the incident in INCIDENT_TEXT, with deliberate contradictions
+# (time, light colour, number of vehicles) for the consolidated report.
+WITNESS_B_TEXT = [
+    "Public Incident Report - Ref TST-0003",
+    "Submitted: 15 March 2025, 08:05",
+    "Last night at around 21:30 I was waiting at the junction near the community centre. "
+    "The traffic light for the main road had just turned red when three vehicles were involved "
+    "in a collision. A silver car hit the back of a taxi, and a motorcycle swerved to avoid them.",
+    "The road was wet from earlier rain. One driver was holding his arm but walked away from the "
+    "cars on his own.",
+]
+
+
+def incident_report_pdf() -> bytes:
+    """Two pages: reporter A's narrative (INCIDENT_TEXT) and an attached real photo."""
+    doc = _new_doc()
+    _text_page(doc, INCIDENT_TEXT)
+    page = _text_page(doc, ["Attachment: Photo 1 (submitted by reporter)"])
+    page.insert_image(pymupdf.Rect(56, 110, A4.width - 56, 472), filename=str(REAL_PHOTO))
+    return _save(doc)
+
+
+def witness_report_pdf() -> bytes:
+    """One page: reporter B's account of the same incident (WITNESS_B_TEXT)."""
+    doc = _new_doc()
+    _text_page(doc, WITNESS_B_TEXT)
     return _save(doc)
 
 

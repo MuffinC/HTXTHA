@@ -20,7 +20,10 @@ class LLMTask(StrEnum):
     """What a request is for. The mock provider dispatches on this; Ollama ignores it."""
 
     VISUAL_ANALYSIS = "visual_analysis"
-    # Added in later milestones: DOCUMENT_ANALYSIS (M3), CONSOLIDATION (M3), TRIAGE (M7).
+    DOCUMENT_ANALYSIS = "document_analysis"
+    CHUNK_NOTES = "chunk_notes"  # map step of map-reduce for long documents
+    CONSOLIDATION = "consolidation"
+    # Added later: TRIAGE (M7).
 
 
 @dataclass(frozen=True)
@@ -36,9 +39,9 @@ class LLMRequest:
         images: Raw PNG/JPEG bytes attached to the user message.
         max_output_tokens: Hard cap on generated tokens. Stops a repetition loop
             from running until the timeout.
-        metadata: Non-content facts about the request (page number, visual
-            reasons). Used by the mock to produce input-derived output; never
-            sent to the model and never logged.
+        metadata: Facts about the request (page numbers, filename, first
+            sentences of each page) that let the mock produce input-derived
+            output. Never sent to the model and never logged.
     """
 
     task: LLMTask

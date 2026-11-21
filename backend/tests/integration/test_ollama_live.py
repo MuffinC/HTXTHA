@@ -7,6 +7,7 @@ instructions written on the page. Assertions are deliberately loose
 (model wording varies); they test structure and gross behaviour, not prose.
 """
 
+import re
 import time
 
 import httpx
@@ -35,6 +36,16 @@ async def _analyse(
     return result
 
 
+def _parse_key_values(key_values: list[str]) -> dict[str, float]:
+    """Turn ["Jan: ~40", "Feb: 75 incidents"] into {"Jan": 40.0, "Feb": 75.0}."""
+    parsed: dict[str, float] = {}
+    for item in key_values:
+        match = re.match(r"\s*(\w+)\s*:\s*~?\s*(-?\d+(?:\.\d+)?)", item)
+        if match:
+            parsed[match.group(1)[:3].title()] = float(match.group(2))
+    return parsed
+
+
 async def test_model_is_vision_capable(
     live_provider: OllamaProvider, live_settings: Settings
 ) -> None:
@@ -57,7 +68,16 @@ async def test_vector_chart_page(live_provider: OllamaProvider, live_settings: S
     charts = [e for e in result.elements if e.type == "chart"]
     assert charts, f"expected a chart, got {[e.type for e in result.elements]}"
     assert charts[0].chart is not None
-    assert charts[0].chart.key_values, "expected values read from the bars"
+
+    # Score the readings against the true bar values: at least 5 of 6 within 10%.
+    read = _parse_key_values(charts[0].chart.key_values)
+    correct = [
+        month
+        for month, true in pdf_factory.VECTOR_CHART_VALUES.items()
+        if month in read and abs(read[month] - true) <= 0.1 * true
+    ]
+    NOTES.append(f"chart values: {len(correct)}/6 within 10% (read {read})")
+    assert len(correct) >= 5, f"only {correct} read within 10%; model read {read}"
 
 
 async def test_real_photo_page_incident_profile(

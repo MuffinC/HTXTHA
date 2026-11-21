@@ -26,11 +26,11 @@ remaining pages are skipped instead of each waiting to fail.
 
 import asyncio
 import logging
-import re
 import time
 from dataclasses import dataclass, field
 
 from app.config import Settings
+from app.llm.artefacts import strip_markers
 from app.llm.base import (
     LLMError,
     LLMOutputInvalidError,
@@ -75,8 +75,6 @@ _EMPTY_REASON = (
 
 VISUAL_BEGIN = "[AI VISUAL DESCRIPTION - page {page}]"
 VISUAL_END = "[/AI VISUAL DESCRIPTION]"
-# Stops model text (which may echo text from the image) from forging or closing a block.
-_DELIMITER_LOOKALIKE = re.compile(r"\[/?\s*AI\s+VISUAL\s+DESCRIPTION[^\]]*\]", re.IGNORECASE)
 
 
 @dataclass
@@ -280,7 +278,8 @@ def _describe(element: VisualElement) -> str:
         lines += ["Table:", element.table_markdown]
     if element.transcription:
         lines += ["Transcription:", element.transcription]
-    return _DELIMITER_LOOKALIKE.sub("", "\n".join(lines))
+    # Model text (which may echo text from the image) must not forge or close a block.
+    return strip_markers("\n".join(lines))
 
 
 def _element_text(element: VisualElement) -> str:

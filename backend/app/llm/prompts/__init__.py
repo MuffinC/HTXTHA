@@ -12,6 +12,9 @@ Available prompts:
 * ``visual_guidance_general`` / ``visual_guidance_incident``: profile-specific
   photo guidance inserted into ``visual_page``. The incident one is the
   evidence-observer variant.
+* ``document_analysis``: stage-3 analysis of one document (full text or notes).
+* ``chunk_notes``: map step for long documents (page-cited notes per group of pages).
+* ``consolidation``: stage-4 comparison across documents labelled D1, D2...
 * ``retry_invalid_output``: appended to a prompt after a validation failure.
 """
 

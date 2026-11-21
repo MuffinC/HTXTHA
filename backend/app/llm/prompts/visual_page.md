@@ -18,6 +18,7 @@ General rules for every element:
 - "possible_inferences" contains conclusions that go beyond what is visible. Each needs a "basis": the visible evidence it rests on. Leave the list empty rather than speculate.
 - "information_gaps" lists relevant things that cannot be determined from the image.
 - If a value is too small or blurred to read, write "unreadable" rather than guessing.
+- Chart values: if bars or points have no printed data labels, estimate each value from the axis gridlines and prefix it with "~" (for example "Mar: ~55"). Use "unreadable" only if the value cannot be estimated at all. A bar may extend beyond the highest labelled gridline.
 - sensitive_content.graphic: true only if the element shows graphic injury, blood or a dead body.
 - sensitive_content.pii_visible: the categories of personal information visible (face, licence_plate, identity_document, name, phone_number, address, signature, other). Never write the values themselves.
 

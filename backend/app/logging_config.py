@@ -10,8 +10,27 @@ or model outputs, because the documents may contain sensitive information.
 import json
 import logging
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
+
+# Correlation IDs for the job/document currently being processed. The worker
+# binds them once per job and per document, and every log line emitted inside
+# (pipeline, LLM provider, httpx) carries them without passing them around.
+_LOG_CONTEXT: ContextVar[dict[str, str]] = ContextVar("log_context", default={})  # noqa: B039
+
+
+@contextmanager
+def log_context(**ids: str) -> Iterator[None]:
+    """Attach correlation IDs (e.g. ``job_id``, ``document_id``) to logs in this block."""
+    token = _LOG_CONTEXT.set({**_LOG_CONTEXT.get(), **ids})
+    try:
+        yield
+    finally:
+        _LOG_CONTEXT.reset(token)
+
 
 # Context fields that callers may attach with ``logger.info(..., extra={...})``.
 # They are copied into the JSON output when present.
@@ -28,6 +47,7 @@ CONTEXT_FIELDS: tuple[str, ...] = (
     "model",
     "prompt_tokens",
     "output_tokens",
+    "count",
 )
 
 
@@ -42,8 +62,11 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        bound = _LOG_CONTEXT.get()
         for field in CONTEXT_FIELDS:
             value = getattr(record, field, None)
+            if value is None:
+                value = bound.get(field)
             if value is not None:
                 payload[field] = value
         if record.exc_info:

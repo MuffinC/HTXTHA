@@ -352,8 +352,10 @@ fail.
 - **Why:** constrained decoding makes malformed JSON rare even with a 4B model. Pydantic's
   `$defs`/`$ref` schemas are accepted by Ollama 0.40.16 (verified live). `think:false` is
   explicit, so a thinking model configured by mistake does not spend minutes reasoning.
-  Low temperature with a fixed seed gives near-reproducible output, which the feedback
-  evaluation set needs for comparing prompt versions. Temperature is 0.1 rather than 0
+  Low temperature with a fixed seed reduces variation, which the feedback evaluation set
+  needs for comparing prompt versions. In practice output still varies from run to run
+  (GPU arithmetic and the prompt cache are not bit-exact), so evaluations use several runs
+  (D-042). Temperature is 0.1 rather than 0
   because pure greedy decoding makes small models more prone to repetition loops. The
   `num_predict` cap turns a loop into a fast "truncated" error (`done_reason: length`)
   instead of a 300 s timeout.
@@ -465,6 +467,285 @@ fail.
   strips the camera EXIF data. Attribution is in `sample_pdfs/README.md`. It is used only
   by `pdf_factory.real_photo_pdf()` for live tests and the benchmark.
 - **Milestone:** M2
+
+## D-031 Chart values: estimate from gridlines (marked "~") rather than "unreadable"
+
+- **Context:** the visual prompt says to write "unreadable" rather than guess, which is an
+  anti-hallucination rule. In the pre-M3 quality check, the model applied it to every bar of
+  `vector_chart.pdf`: the bars have no printed data labels, so it reported all six values as
+  "unreadable", although the axes, months and trend were all correct.
+- **Decision:** one added rule in `visual_page.md`. If bars or points have no printed labels,
+  estimate each value from the axis gridlines and prefix it with `~`. Use "unreadable" only if
+  no estimate is possible, and note that a bar may extend beyond the top labelled gridline.
+- **Trade-off:** usefulness against the anti-hallucination rule. An estimate is still a
+  reading of visible geometry, not an invention, and the `~` prefix keeps estimates visibly
+  apart from printed values, in line with the observation-versus-inference principle. The
+  rule for genuinely illegible text (blurred, tiny) is unchanged.
+- **Evidence** (true values from `pdf_factory.VECTOR_CHART_VALUES`):
+
+  | Month | True | Before | After |
+  |---|---|---|---|
+  | Jan | 40 | unreadable | ~40 |
+  | Feb | 75 | unreadable | ~75 |
+  | Mar | 55 | unreadable | ~55 |
+  | Apr | 110 (above the 100 gridline) | unreadable | ~110 |
+  | May | 90 | unreadable | ~90 |
+  | Jun | 65 | unreadable | ~70 |
+  | **Accuracy** | | **0 of 6** | **5 of 6 exact, 6 of 6 within 10% (mean error 0.8)** |
+
+  The result was identical at 150 and 200 DPI, so resolution was not the limit.
+- **Regression guard:** `test_vector_chart_page` (live) now requires at least 5 of 6 values
+  within ±10% of the truth.
+- **Photo detail, tried and reverted:** one attempt added "always include one observation each
+  on lighting, weather and road surface; describe positions without implying intent ('on the
+  verge', not 'parked')" to the incident guidance. It removed "parked" and added the pedestrian
+  and other vehicles. But it recorded weather and road surface as "not visible" in
+  `information_gaps`, although the photo shows daylight and a dry road, it never mentioned
+  lighting, and it stated cause as fact ("damaged after colliding with a tree", "indicating a
+  collision point"). It failed the acceptance test, so it was reverted, and the sparse output
+  is recorded as ASSUMPTIONS L-006.
+- **Milestone:** M2 follow-up (before M3)
+
+## D-032 New dependency: `python-multipart`
+
+- FastAPI needs `python-multipart` to parse `multipart/form-data` (`File()` / `Form()`), which
+  `POST /api/jobs` requires. The `fastapi` package does not install it unless you use the
+  `fastapi[standard]` extra, which would also pull in a CLI and email validation that the
+  project does not use. Pinned exactly (`0.0.34`) like every other dependency (D-009).
+- **Milestone:** M3
+
+## D-033 SQLite via the standard library, synchronous calls under a lock
+
+- **Decision:** `app/storage/repository.py` uses `sqlite3` directly, with no ORM and no async
+  driver. There are two tables, `jobs` and `documents`. One connection is shared by the
+  routes and the worker and guarded by a `threading.Lock`, with WAL mode enabled. Results
+  (`DocumentAnalysis`, `ConsolidatedReport`) are stored as the JSON their Pydantic models
+  produce, so the API returns exactly what was validated.
+- **Why:** the data model is tiny, there is one analyst and one worker, and every statement is
+  a single-row write that takes well under a millisecond. Calling it synchronously from the
+  event loop is simpler than an async driver and costs nothing measurable. An ORM would add a
+  dependency and a migration story for two tables.
+- **Rejected files are stored too,** as `rejected` documents with their error, so
+  `GET /api/jobs/{id}` tells the whole story and not only the `POST` response does.
+- **Status is written at every transition** (spec section 6), so polling shows live progress.
+- **Milestone:** M3
+
+## D-034 Every citation is checked after validation; invalid ones are dropped and flagged
+
+- **Context:** schema validation proves a page is an integer, not that it exists. Small models
+  sometimes cite page 7 of a 3-page document or a document label that does not exist.
+- **Rules:**
+  - Document analysis: entity pages outside `1..page_count` are removed, and an entity left
+    with no valid page is dropped as unverifiable. Notable points with an invalid page are
+    dropped.
+  - Map-reduce notes that cite a page outside their own chunk are dropped.
+  - Consolidated report: a citation with an unknown label, or a page outside that document,
+    is removed. Themes, agreements and timeline events left with no valid citation are
+    dropped. Contradictions need at least two valid positions, and document groups need at
+    least two valid documents.
+- **Surfacing:** every removal is counted in a WARNING log (`event: citations_removed`,
+  `count`) and becomes a `CITATIONS_REMOVED` warning shown to the analyst. A citation that
+  leads nowhere is worse than none (principle 3), but silently fixing the output would hide
+  that the model was unreliable on this document.
+- **Spec addition:** `ConsolidatedReport.warnings` (optional, default empty) carries these
+  warnings, because the spec's consolidated schema has no warnings field.
+- **Live evidence:** zero citations were removed in the two-document live run (D-039), and
+  the unit tests cover each rule.
+- **Milestone:** M3
+
+## D-035 Short document labels (D1, D2…) in the consolidation prompt
+
+- **Decision:** stage 4 shows documents to the model as `D1`, `D2`… and maps the labels back
+  to UUIDs afterwards. Parsing is tolerant (`D2`, `d2`, `D 2` and `Document D2` all resolve);
+  anything else counts as an invalid citation (D-034).
+- **Why:** a 4B model copies a two-character label reliably but often mangles a 36-character
+  UUID, which would turn every citation into an invalid one. Labels also cost far fewer
+  tokens.
+- **Filenames are not sent to the model** at any stage. They are user-controlled (an
+  injection vector, and possibly personal data) and add nothing to the analysis.
+- **Milestone:** M3
+
+## D-036 Context budgeting and map-reduce for long documents
+
+- **Why budget at all:** Ollama silently drops the *start* of a prompt longer than `num_ctx`.
+  That would cut the system prompt and its security rules first. Every stage therefore checks
+  its input before calling the model.
+- **Estimate:** 3 characters per token, which is pessimistic since English averages about 4.
+  A fixed 1,500-token allowance covers the system prompt and instructions (measured at about
+  1.2k). No tokenizer dependency is needed. The budget is `num_ctx` minus that allowance minus
+  the output cap: 3,072 tokens for analysis, 2,048 for notes, 4,096 for consolidation.
+- **Map-reduce (spec section 6):** if the page-headed text exceeds the analysis budget,
+  consecutive pages are grouped into chunks that fit the notes budget. Each chunk produces up
+  to 15 page-cited notes (`ChunkNotes`, one retry), and the analysis then runs over the notes
+  written as `(p.N) …`. At 16k context the single-pass budget is about 11.8k tokens, or
+  roughly 35k characters, so a typical document up to about 15 pages stays single-pass.
+- **Truncation, always flagged:** a single page larger than a chunk is cut with a
+  `CONTENT_TRUNCATED` warning for that page. If the notes still exceed the budget, the tail is
+  dropped with a warning naming the first page left out. The consolidation input is capped per
+  document (12 points, 15 entities, 6 visuals) and truncated with a warning if needed.
+- **All document text, and model text derived from it** (notes, analyses), is wrapped with the
+  random boundary token (D-025) before it reaches the model.
+- **Milestone:** M3
+
+## D-037 Job and document status rules
+
+- A document that fails (timeout, unavailable, refused, invalid after one retry, or an
+  unexpected error) is marked `failed` with a code and a backend-written message, and the job
+  continues.
+- **Job status:** `completed` if every queued document succeeded and the consolidated report
+  was built. `partial` if at least one document succeeded but another failed, or if stage 4
+  failed (each document's own analysis is still available). `failed` if no document succeeded
+  (`NO_DOCUMENT_ANALYSED`). Files rejected at upload do not affect job status; they are already
+  reported per file.
+- **Consolidated report needs two or more analysed documents.** With one, it is skipped and
+  `consolidated_error` is `SINGLE_DOCUMENT`. A cross-document report of one document would
+  invite invented relations and costs a model call.
+- **Retries:** stage 3 gets one retry on invalid output (the spec). Stage 4 and the map step
+  also get one, because their failure is equally recoverable. Stage 2 gets none (D-028).
+- **Milestone:** M3
+
+## D-038 Restart recovery: unfinished jobs are failed with `INTERRUPTED`
+
+- **Decision:** on startup, every job still `queued` or `processing`, and its unfinished
+  documents, becomes `failed` with code `INTERRUPTED` and the message "The backend restarted
+  before this job finished. Please upload the files again." Their uploads are deleted unless
+  `RETAIN_UPLOADS=true`.
+- **Why queued jobs too:** the queue is in memory (spec section 4), so a queued job would never
+  be picked up again either. Re-queuing them automatically was rejected: their uploads may
+  already be gone, and silently resuming hour-old work is surprising for an analyst. Failing
+  clearly is honest and simple.
+- **Milestone:** M3
+
+## D-039 Upload API details
+
+- **Field name:** `files`, repeated once per file. This is what the spec's `files[]` notation
+  means, and it is the standard multipart convention. `profile` defaults to `general`.
+- **Profiles:** `GET /api/profiles` lists all three with an `available` flag. Only `general`
+  is available in M3. Incident arrives in M6 and statistical in M8. Unavailable profiles are
+  rejected with 400 `UNSUPPORTED_PROFILE`, and an unknown profile string gets 422.
+- **Size limits in two layers:** a middleware refuses any POST whose `Content-Length`
+  exceeds `MAX_FILES × MAX_FILE_MB + 1 MB` with 413 `FILE_TOO_LARGE`, before the body is
+  parsed. In the route, each file is read in 1 MB chunks and reading stops as soon as it passes
+  `MAX_FILE_MB`, so that file is rejected without being held in memory.
+- **Storage:** accepted files are written to `<DATA_DIR>/uploads/<uuid>.pdf`
+  (`UploadStore.path` refuses anything that is not a UUID) and deleted once their document is
+  processed, unless `RETAIN_UPLOADS=true`. Page previews (M8) will need this setting or a
+  rendered-page cache.
+- **Live end-to-end** (`tests/integration/test_ollama_e2e.py`): two synthetic reports of the
+  same incident (3 pages, 1 photo) took **45.8 s** from upload to completed. That breaks down
+  as 1 visual call, 2 analysis calls and 1 consolidation call on the RTX 3070 with flash
+  attention and q8_0 KV (D-023). A later run of the same test took 86 s, so expect
+  roughly 45–90 s depending on GPU state and output length.
+- **Milestone:** M3
+
+## D-040 Log correlation through a context variable
+
+- `app/logging_config.py` keeps `job_id` and `document_id` in a `ContextVar`, and the worker
+  binds them with `log_context(...)` once per job and once per document. Every log line inside,
+  from the pipeline, the LLM provider and even httpx, carries them without passing IDs through
+  every function. Asyncio tasks copy the context, so this is safe with the single worker.
+- Logged: stage start and end with `duration_ms`, model-call latency and token counts,
+  `citations_removed` counts, map-reduce use, validation rejections, and security events at
+  WARNING. Document text, model output and filenames are never logged. A test asserts that
+  neither the fixture's text nor its filename appears in the captured logs.
+- **Milestone:** M3
+
+## D-041 People named in document text may be recorded by name (General profile)
+
+- The M2 system prompt said "do not identify real people … refer to people by role", which was
+  written with photos in mind. Applied to text, it would stop the General profile from listing
+  a minister named in a news article. It now reads: never guess or infer identity, never
+  identify people from their appearance in images, and refer to people *not named in the text*
+  by role.
+- The incident profile (M6) will require roles even for named people, as the spec says.
+- **Milestone:** M3
+
+## D-042 Contradiction scorecard: M3 baseline (the M6 acceptance measure)
+
+- **What:** `tests/integration/test_ollama_scorecard.py` (live, `pytest -m ollama`, report
+  only). It uploads the synthetic pair (`incident_report_pdf`, `witness_report_pdf`) with four
+  planted contradictions: time 21:15 vs 21:30, weather dry vs wet, traffic light green vs red,
+  and vehicle count two vs three. It prints found/missed for each, the false contradictions
+  (absence wording such as "no mention" always counts as false), whether the pair is grouped
+  as one incident, whether the report calls them separate incidents, the timeline, and any
+  pipeline artefacts listed as entities. It fails only if the pipeline fails.
+- **Unplanted but genuine:** report A says "nobody appeared to be hurt" and report B says "one
+  driver was holding his arm". Contradictions about injury or driver behaviour are reported as
+  "genuine, unplanted", not false (unless they use absence wording).
+- **Matching is keyword-based** on each contradiction's topic and positions. A vehicle-count
+  contradiction also matches on its topic ("number of vehicles"), because the model tends to
+  list the vehicles instead of writing "three". It is a rough measure, so read the printed
+  topics too.
+- **Run-to-run variance is large** despite temperature 0.1 and a fixed seed (D-024): GPU
+  arithmetic and Ollama's prompt cache are not bit-exact. So scores are given over several runs.
+
+  | Measure | **M3 baseline** (7 runs) | After the D-043/D-044 fixes (7 runs) |
+  |---|---|---|
+  | Planted contradictions found (of 4) | 4, 3, 3, 2, 2, 2, 3: **mean 2.7**, median 3 | 3, 2, 1, 2, 2, 3, 2: **mean 2.1**, median 2 |
+  | time / weather / light / count | 7/7, 7/7, **1/7**, 4/7 | 6/7, 7/7, **0/7**, 2/7 |
+  | False contradictions per run | 0, 2, 0, 1, 1, 2, 0: mean 0.9 | 1, 1, 2, 2, 3, 0, 2: mean 1.6 |
+  | Runs with an "absence" contradiction | 2/7 | 2/7 |
+  | Grouped as the same incident | 6/7 | 5/7 |
+  | Report calls them separate incidents | 2/7 | 4/7 |
+  | Date arithmetic in the timeline | seen (e.g. "15 March 2025 at 21:30 the previous night") | 0/7 ("the previous night" kept) |
+  | "AI VISUAL DESCRIPTION" listed as an entity | 4/7 | 0/7 |
+  | Footer listed as an entity | 7/7 (both documents) | 7/7 (one-page report B only; A-120) |
+
+  The baseline was measured on the M3 code as approved, before any change in this entry.
+  Four of its runs used the first version of the scorer and were re-scored by hand, from the
+  printed topics, under the final rules.
+- **Reading:** the deterministic fixes did what they targeted: marker entities are gone and
+  there is no more date arithmetic. The absence rule did **not** measurably help (2 of 7 runs
+  before and after). Contradiction detection did **not** improve: the light colour is almost
+  never found (1 of 14 runs), and "separate incidents" wording rose. With n=7 this may be
+  noise, or the extra prompt rules may be diluting a 4B model's attention. Per the author's direction, prompts were not tuned
+  further here.
+- **M6 acceptance:** the incident profile (explicit claims and consistency checks) should beat
+  the M3 baseline on this scorecard: mean planted found above 2.7 of 4, the traffic light
+  found in most runs, at most one absence contradiction in total, and the pair grouped as the
+  same incident in most runs.
+- **Milestone:** M3 follow-up
+
+## D-043 Deterministic removal of pipeline artefacts and running headers/footers
+
+- **Markers (`app/llm/artefacts.py`):** every string in every model output is cleaned in one
+  place (`parse_output`, before validation) of `[AI VISUAL DESCRIPTION …]` markers, the bare
+  phrase "AI VISUAL DESCRIPTION", `UNTRUSTED_CONTENT_BEGIN/END` boundaries and
+  `--- Page N ---` headings. Strings left empty are dropped from string lists. Each stage then
+  drops structured items left empty: entities with no name, blank points, and themes,
+  agreements and timeline events with no text. Dropping artefacts is not a citation problem,
+  so it raises no `CITATIONS_REMOVED` warning.
+- **Running headers/footers (`extraction.remove_repeated_lines`):** a line is boilerplate if it
+  lies entirely in the top or bottom 8% of the page *and*, normalised (case, whitespace,
+  digits → `#`, so "Page 3 of 9" matches "Page 4 of 9"), appears there on at least 60% of
+  pages and on two or more. Such lines are removed from the page text sent to the model and
+  kept in `ExtractedDocument.boilerplate_lines`.
+  - **Why position and repetition together:** the first version used repetition alone, and
+    it removed *all* body text from documents whose pages share content (duplicated pages, or
+    numbered findings that become identical once digits are normalised). Found by checking the
+    fixtures; covered by `test_repeated_body_text_is_kept`.
+  - **Order:** removal happens after the injection scan, so a footer cannot hide an attack
+    (`test_injection_in_a_footer_is_still_flagged`).
+- **Entity backstop:** the model can still see a footer in a rendered page image. An entity or
+  topic is dropped if it occurs in a boilerplate line and nowhere in the text the model was
+  given. So an organisation named in a running header *and* in the body is kept, and one named
+  only in the header is dropped.
+- **Milestone:** M3 follow-up
+
+## D-044 Prompt rules: absence is a gap, not a contradiction; no date arithmetic
+
+- `consolidation.md`: "A document that does not mention something is NOT a contradiction: both
+  documents must make a statement about the same thing, and the statements must conflict. If
+  only one document mentions something, put the open question in information_gaps."
+- `consolidation.md` and `document_analysis.md`: "Do not calculate dates: keep relative times as
+  written, together with their reference point", with the example "the previous night (report
+  submitted 15 March 2025)". `document_analysis.md` also says that page headings, content
+  markers and `[AI VISUAL DESCRIPTION]` markers are not part of the document.
+- **Effect** (D-042): no date arithmetic in 7 of 7 runs, although the model rarely attaches the
+  reference point inside the timeline entry itself. The absence rule had no measurable effect
+  (absence contradictions in 2 of 7 runs, before and after), so the scorecard keeps counting
+  them and M6 must address them structurally.
+- **Milestone:** M3 follow-up
 
 ---
 

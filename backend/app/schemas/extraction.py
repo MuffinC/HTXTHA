@@ -29,6 +29,10 @@ class PageContent(BaseModel):
         description="Fraction of the page covered by non-decorative visuals; used to "
         "prioritise pages when MAX_VISUAL_PAGES_PER_DOC is reached",
     )
+    margin_lines: list[str] = Field(
+        default_factory=list,
+        description="Text lines in the top/bottom margin band (header/footer candidates)",
+    )
     selected_for_visual_analysis: bool = Field(
         default=False, description="True if this page is within the per-document visual cap"
     )
@@ -40,6 +44,10 @@ class ExtractedDocument(BaseModel):
     page_count: int
     pages: list[PageContent]
     warnings: list[DocumentWarning] = Field(default_factory=list)
+    boilerplate_lines: list[str] = Field(
+        default_factory=list,
+        description="Header/footer lines repeated on most pages, removed from page text",
+    )
 
     @property
     def visual_pages(self) -> list[int]:

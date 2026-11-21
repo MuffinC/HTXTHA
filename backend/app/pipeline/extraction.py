@@ -21,6 +21,8 @@ maliciously huge page cannot exhaust memory.
 """
 
 import logging
+import math
+import re
 import time
 
 import pymupdf
@@ -57,6 +59,13 @@ MIN_TABLE_FILL_RATIO = 0.5
 # Hard cap on rendered image size: about 2000 x 2000 px. A4 at 150 DPI is
 # 1240 x 1754 (2.2 MP), so normal pages are never downscaled.
 MAX_RENDER_PIXELS = 4_000_000
+# Header/footer candidates must lie entirely in the top or bottom 8% of the page...
+MARGIN_BAND_RATIO = 0.08
+# ...and appear there on at least this share of pages (and on two or more).
+REPEATED_LINE_PAGE_RATIO = 0.6
+# Very short lines ("-", "1") and long paragraphs are never treated as headers/footers.
+REPEATED_LINE_MIN_CHARS = 4
+REPEATED_LINE_MAX_CHARS = 200
 
 
 # --------------------------------------------------------------------------- public API
@@ -94,6 +103,10 @@ def extract_document(data: bytes, settings: Settings) -> ExtractedDocument:
         )
     warnings.extend(injection)
 
+    # After the injection scan (a footer must not be able to hide an attack from it),
+    # repeated header/footer lines are taken out of the text sent to the model.
+    boilerplate = remove_repeated_lines(pages)
+
     cap_warning = _select_visual_pages(pages, settings.max_visual_pages_per_doc)
     if cap_warning:
         warnings.append(cap_warning)
@@ -104,7 +117,70 @@ def extract_document(data: bytes, settings: Settings) -> ExtractedDocument:
         sum(p.selected_for_visual_analysis for p in pages),
         extra={"stage": "extracting", "duration_ms": round((time.perf_counter() - started) * 1000)},
     )
-    return ExtractedDocument(page_count=page_count, pages=pages, warnings=warnings)
+    return ExtractedDocument(
+        page_count=page_count, pages=pages, warnings=warnings, boilerplate_lines=boilerplate
+    )
+
+
+def remove_repeated_lines(pages: list[PageContent]) -> list[str]:
+    """Remove header/footer lines that repeat on most pages; return them.
+
+    A line counts as boilerplate if it lies in the top or bottom margin band
+    (``MARGIN_BAND_RATIO``) and, after normalising (case, whitespace, and digits,
+    so "Page 3 of 9" matches "Page 4 of 9"), appears in that band on at least
+    ``REPEATED_LINE_PAGE_RATIO`` of the pages and on two or more. Requiring both
+    position and repetition matters: on repetition alone, documents whose pages
+    share body text (duplicated pages, numbered findings) lost all their text.
+    Running headers, footers and classification banners would otherwise turn up
+    as entities. A one-page document has nothing to compare, so nothing is removed.
+
+    Args:
+        pages: Extracted pages. Their ``text`` is updated in place.
+
+    Returns:
+        One original example of each removed line, for logging and filtering.
+    """
+    if len(pages) < 2:
+        return []
+    threshold = max(2, math.ceil(REPEATED_LINE_PAGE_RATIO * len(pages)))
+    counts: dict[str, int] = {}
+    examples: dict[str, str] = {}
+    for page in pages:
+        for raw in page.margin_lines:
+            examples.setdefault(_normalise_line(raw), raw)
+        for line in {_normalise_line(raw) for raw in page.margin_lines}:
+            if REPEATED_LINE_MIN_CHARS <= len(line) <= REPEATED_LINE_MAX_CHARS:
+                counts[line] = counts.get(line, 0) + 1
+    repeated = {line for line, n in counts.items() if n >= threshold}
+    if not repeated:
+        return []
+    for page in pages:
+        kept = [raw for raw in page.text.splitlines() if _normalise_line(raw) not in repeated]
+        page.text = "\n".join(kept)
+    logger.info(
+        "Removed repeated header/footer lines",
+        extra={"stage": "extracting", "event": "boilerplate_removed", "count": len(repeated)},
+    )
+    return sorted(examples[line] for line in repeated)
+
+
+def _margin_lines(page: pymupdf.Page) -> list[str]:
+    """Text lines lying entirely in the top or bottom margin band of the page."""
+    band = MARGIN_BAND_RATIO * page.rect.height
+    top, bottom = page.rect.y0 + band, page.rect.y1 - band
+    lines: list[str] = []
+    for block in page.get_text("dict")["blocks"]:
+        for line in block.get("lines", []):
+            _, y0, _, y1 = line["bbox"]
+            if y1 <= top or y0 >= bottom:
+                text = "".join(span["text"] for span in line["spans"]).strip()
+                if text:
+                    lines.append(text)
+    return lines
+
+
+def _normalise_line(line: str) -> str:
+    return re.sub(r"\d+", "#", " ".join(line.split()).lower())
 
 
 def page_has_any_content(page: pymupdf.Page) -> bool:
@@ -208,6 +284,7 @@ def _extract_page(page: pymupdf.Page, number: int) -> tuple[PageContent, list[Do
         needs_visual_analysis=bool(reasons),
         visual_reasons=reasons,
         visual_area_ratio=round(ratio, 4),
+        margin_lines=_margin_lines(page),
     )
     return content, warnings
 

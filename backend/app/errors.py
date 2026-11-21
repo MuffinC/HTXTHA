@@ -26,8 +26,16 @@ class ErrorCode(StrEnum):
     EMPTY_DOCUMENT = "EMPTY_DOCUMENT"
     ACTIVE_CONTENT = "ACTIVE_CONTENT"
 
+    # ---- Document processing (per document, in GET /api/jobs/{id}) ----
+    LLM_OUTPUT_INVALID = "LLM_OUTPUT_INVALID"  # still invalid after one retry (spec section 6)
+    LLM_TIMEOUT = "LLM_TIMEOUT"
+    LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
+    LLM_REFUSED = "LLM_REFUSED"
+    INTERRUPTED = "INTERRUPTED"  # backend restarted while the job was queued or running
+
     # ---- Generic request errors ----
     NO_VALID_FILES = "NO_VALID_FILES"
+    UNSUPPORTED_PROFILE = "UNSUPPORTED_PROFILE"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     NOT_FOUND = "NOT_FOUND"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"

@@ -18,6 +18,8 @@ class WarningCode(StrEnum):
     VISUAL_PAGES_CAPPED = "VISUAL_PAGES_CAPPED"
     TABLE_EXTRACTION_FAILED = "TABLE_EXTRACTION_FAILED"
     VISUAL_ANALYSIS_FAILED = "VISUAL_ANALYSIS_FAILED"  # per page: model error/refusal/timeout
+    CITATIONS_REMOVED = "CITATIONS_REMOVED"  # model cited pages/documents that do not exist
+    CONTENT_TRUNCATED = "CONTENT_TRUNCATED"  # text cut to fit the model's context window
 
 
 class Citation(BaseModel):

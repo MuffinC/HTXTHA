@@ -5,3 +5,5 @@ pydantic==2.14.4
 pydantic-settings==2.16.3
 httpx==0.28.1
 pymupdf==2.1
+# Required by FastAPI for multipart file uploads (POST /api/jobs). See docs/DECISIONS.md D-032.
+python-multipart==0.0.34

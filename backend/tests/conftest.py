@@ -6,11 +6,13 @@ Fixture PDFs are generated in memory with PyMuPDF by ``tests/pdf_factory.py``
 """
 
 from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+from fastapi import FastAPI
 
 from app.config import Settings
 from app.main import create_app
@@ -37,10 +39,20 @@ def make_settings(tmp_path: Path) -> Callable[..., Settings]:
     return _make
 
 
+@asynccontextmanager
+async def app_client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    """Run the app's lifespan (storage + worker) and yield an in-process client.
+
+    ``httpx.ASGITransport`` does not run the lifespan by itself.
+    """
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+
+
 @pytest.fixture
 async def client(settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
-    """An httpx client bound to an in-process app (no network)."""
-    app = create_app(settings)
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+    """An httpx client bound to an in-process app with the mock provider (no network)."""
+    async with app_client(create_app(settings)) as ac:
         yield ac
