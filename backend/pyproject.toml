@@ -21,3 +21,9 @@ extend-immutable-calls = ["fastapi.Depends"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# Live-model tests are opt-in: they need a running Ollama with the model pulled.
+# Run them with:  pytest -m ollama   (a -m on the command line overrides this one)
+addopts = "-m 'not ollama'"
+markers = [
+    "ollama: integration test against a real local Ollama model (skipped by default and in CI)",
+]

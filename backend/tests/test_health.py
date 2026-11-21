@@ -1,12 +1,12 @@
-"""Tests for GET /api/health and the Ollama readiness check."""
+"""Tests for GET /api/health (readiness via the provider interface)."""
 
 from pathlib import Path
 
 import httpx
 import pytest
 
-from app.api.health import ollama_model_ready
 from app.config import Settings
+from app.llm.ollama import OllamaProvider
 from app.main import create_app
 
 
@@ -54,6 +54,23 @@ def _tags_transport(model_names: list[str], status: int = 200) -> httpx.MockTran
     return httpx.MockTransport(handler)
 
 
+async def test_health_ollama_ready_reports_ok(tmp_path: Path) -> None:
+    settings = Settings(llm_provider="ollama", data_dir=tmp_path, log_level="WARNING")
+    provider = OllamaProvider(settings, transport=_tags_transport([settings.ollama_model]))
+    app = create_app(settings, provider=provider)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get("/api/health")
+
+    assert response.json() == {
+        "status": "ok",
+        "provider": "ollama",
+        "model": "qwen3-vl:4b-instruct",
+        "model_ready": True,
+    }
+
+
 @pytest.mark.parametrize(
     ("requested", "available", "expected"),
     [
@@ -63,20 +80,18 @@ def _tags_transport(model_names: list[str], status: int = 200) -> httpx.MockTran
         ("qwen3-vl:4b-instruct", [], False),  # model not pulled yet
     ],
 )
-async def test_ollama_model_ready_matches_tags(
-    requested: str, available: list[str], expected: bool
+async def test_ollama_is_ready_matches_tags(
+    tmp_path: Path, requested: str, available: list[str], expected: bool
 ) -> None:
-    ready = await ollama_model_ready(
-        "http://ollama", requested, transport=_tags_transport(available)
-    )
-    assert ready is expected
+    settings = Settings(ollama_model=requested, data_dir=tmp_path)
+    provider = OllamaProvider(settings, transport=_tags_transport(available))
+    assert await provider.is_ready() is expected
 
 
-async def test_ollama_model_ready_handles_server_error() -> None:
-    ready = await ollama_model_ready(
-        "http://ollama", "any", transport=_tags_transport([], status=500)
-    )
-    assert ready is False
+async def test_ollama_is_ready_handles_server_error(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path)
+    provider = OllamaProvider(settings, transport=_tags_transport([], status=500))
+    assert await provider.is_ready() is False
 
 
 async def test_openapi_docs_available(client: httpx.AsyncClient) -> None:

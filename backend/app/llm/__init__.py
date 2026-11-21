@@ -1,1 +1,2 @@
-"""LLM provider interface and implementations (Ollama, mock). Added in M2."""
+"""LLM layer: provider interface (``base``), Ollama and mock providers, the
+structured-output helper (``structured``) and prompt templates (``prompts/``)."""

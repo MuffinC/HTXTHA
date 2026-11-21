@@ -44,3 +44,12 @@ Write-Host "Activate with: .\backend\.venv\Scripts\Activate.ps1"
 Write-Host 'Run the API (mock mode): cd backend; $env:LLM_PROVIDER="mock"; $env:DATA_DIR="./data"; uvicorn app.main:app --reload'
 Write-Host "Then open http://127.0.0.1:8000/api/health (use 127.0.0.1, not localhost: localhost may resolve to IPv6, which uvicorn does not listen on)."
 Write-Host "API docs: http://127.0.0.1:8000/api/docs"
+Write-Host ""
+Write-Host "Real model (native Ollama instead of Docker):"
+Write-Host '  - Point the backend at it: $env:OLLAMA_BASE_URL="http://127.0.0.1:11434" (the default http://ollama:11434 is the Docker hostname).'
+Write-Host "  - Run Ollama with flash attention and a q8_0 KV cache, so the 16k context fits in 8 GB of VRAM (docs/DECISIONS.md D-023):"
+Write-Host "      setx OLLAMA_FLASH_ATTENTION 1"
+Write-Host "      setx OLLAMA_KV_CACHE_TYPE q8_0"
+Write-Host "    then fully quit Ollama (tray icon > Quit, and check no ollama.exe is left in Task Manager) and start it again."
+Write-Host "    Check: %LOCALAPPDATA%\Ollama\server.log should show '--flash-attn on'; 'ollama ps' shows ~4.4 GB, not 5.5 GB."
+Write-Host "  - Live model tests (opt-in): cd backend; pytest -m ollama"

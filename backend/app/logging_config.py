@@ -23,6 +23,11 @@ CONTEXT_FIELDS: tuple[str, ...] = (
     "event",
     "code",
     "page",
+    # Model-call metadata (never prompts or outputs).
+    "task",
+    "model",
+    "prompt_tokens",
+    "output_tokens",
 )
 
 

@@ -18,6 +18,8 @@ from app import __version__
 from app.api import health
 from app.api.errors import register_error_handlers
 from app.config import Settings, get_settings
+from app.llm.base import LLMProvider
+from app.llm.factory import build_provider
 from app.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -25,26 +27,29 @@ logger = logging.getLogger(__name__)
 API_PREFIX = "/api"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, provider: LLMProvider | None = None) -> FastAPI:
     """Build and configure the FastAPI application.
 
     Args:
         settings: Optional settings override (used by tests). Defaults to
             settings read from the environment.
+        provider: Optional LLM provider override (used by tests). Defaults to
+            the provider selected by ``LLM_PROVIDER``.
 
     Returns:
         A configured ``FastAPI`` instance.
     """
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+    llm_provider = provider or build_provider(settings)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         # Log an explicit allow-list of config values, never the whole object.
         logger.info(
             "Backend starting: provider=%s model=%s",
-            settings.llm_provider,
-            settings.ollama_model,
+            llm_provider.name,
+            llm_provider.model,
             extra={"event": "startup"},
         )
         yield
@@ -66,6 +71,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Every request in this app instance sees the settings it was built with.
     app.dependency_overrides[get_settings] = lambda: settings
+    # One provider per app; routes get it through app.api.deps.get_provider.
+    app.state.provider = llm_provider
 
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)

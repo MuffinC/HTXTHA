@@ -104,11 +104,18 @@ def scan_text(text: str, page: int | None = None) -> list[InjectionMatch]:
     ]
 
 
-def injection_warnings(pages: list[tuple[int, str]]) -> list[DocumentWarning]:
+def injection_warnings(
+    pages: list[tuple[int, str]], subject: str = "This page contains text"
+) -> list[DocumentWarning]:
     """Scan ``(page_number, text)`` pairs and build one warning per flagged page.
 
     The message names the matched *categories* only, never the matched text:
     warnings are shown in the UI and the matched text is attacker-controlled.
+
+    Args:
+        pages: ``(page_number, text)`` pairs to scan.
+        subject: Start of the warning sentence, so the analyst can tell text-layer
+            hits from text the model read out of an image.
     """
     warnings: list[DocumentWarning] = []
     for page, text in pages:
@@ -119,7 +126,7 @@ def injection_warnings(pages: list[tuple[int, str]]) -> list[DocumentWarning]:
                 DocumentWarning(
                     code=WarningCode.INJECTION_SUSPECTED,
                     message=(
-                        "This page contains text that looks like instructions to an AI "
+                        f"{subject} that looks like instructions to an AI "
                         f"system ({labels}). It was analysed as data only; review the "
                         "AI output for this document with extra care."
                     ),

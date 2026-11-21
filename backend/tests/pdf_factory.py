@@ -6,8 +6,12 @@ Single source for both:
 
 Every builder returns the file as ``bytes``. Images are generated in-process as
 solid-colour pixmaps, so no external assets or extra imaging library is needed.
-All content is fictional.
+The one exception is ``real_photo_pdf``, which embeds a public-domain photo from
+``tests/assets/`` for the live model tests (attribution in ``sample_pdfs/README.md``).
+All text content is fictional.
 """
+
+from pathlib import Path
 
 import pymupdf
 
@@ -15,6 +19,9 @@ import pymupdf
 A4 = pymupdf.paper_rect("a4")
 
 FOOTER = "SYNTHETIC SAMPLE - generated test file - fictional content"
+
+# Public-domain photo (Wikimedia Commons "Car crash 1.jpg", by User:Thue), downscaled.
+REAL_PHOTO = Path(__file__).parent / "assets" / "car_crash_1.jpg"
 
 # Password for the encrypted sample. Published on purpose: it is a demo file.
 ENCRYPTED_PASSWORD = "htx-demo"  # noqa: S105 - not a secret
@@ -141,6 +148,25 @@ def photo_pdf() -> bytes:
     doc = _new_doc()
     page = _text_page(doc, INCIDENT_TEXT[:2])
     page.insert_image(pymupdf.Rect(56, 300, 456, 600), pixmap=solid_pixmap(800, 600, (90, 120, 90)))
+    return _save(doc)
+
+
+def real_photo_pdf() -> bytes:
+    """A ticket-style page: a short header and a real photo of a vehicle collision.
+
+    Used by the live (``@pytest.mark.ollama``) tests and the vision benchmark; the
+    unit tests use solid-colour images instead.
+    """
+    doc = _new_doc()
+    page = _text_page(
+        doc,
+        [
+            "Public Incident Report - Ref TST-0002",
+            "Attachment: Photo 1 (submitted by reporter)",
+        ],
+    )
+    # 1024 x 768 photo, scaled to the text width (about 483 x 362 pt).
+    page.insert_image(pymupdf.Rect(56, 130, A4.width - 56, 492), filename=str(REAL_PHOTO))
     return _save(doc)
 
 

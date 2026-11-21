@@ -1,8 +1,13 @@
 """Shared schema types used across pipeline stages and API responses."""
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+# Analysis profiles (CLAUDE.md section 2). The profile picks the prompts and the
+# schema extension; "incident" also switches visual analysis to evidence-observer mode.
+Profile = Literal["general", "incident", "statistical"]
 
 
 class WarningCode(StrEnum):
@@ -12,7 +17,14 @@ class WarningCode(StrEnum):
     ACTIVE_CONTENT = "ACTIVE_CONTENT"  # only when ACTIVE_CONTENT_POLICY=warn
     VISUAL_PAGES_CAPPED = "VISUAL_PAGES_CAPPED"
     TABLE_EXTRACTION_FAILED = "TABLE_EXTRACTION_FAILED"
-    VISUAL_ANALYSIS_FAILED = "VISUAL_ANALYSIS_FAILED"  # used from M2
+    VISUAL_ANALYSIS_FAILED = "VISUAL_ANALYSIS_FAILED"  # per page: model error/refusal/timeout
+
+
+class Citation(BaseModel):
+    """A pointer to the source of a claim: document plus 1-based page."""
+
+    document_id: str
+    page: int = Field(ge=1)
 
 
 class DocumentWarning(BaseModel):

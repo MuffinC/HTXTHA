@@ -52,7 +52,8 @@ definitions are in `CLAUDE.md` section 8.
 
 `WarningCode`: `INJECTION_SUSPECTED` (per page), `ACTIVE_CONTENT` (only with policy `warn`),
 `VISUAL_PAGES_CAPPED` (lists the skipped pages), `TABLE_EXTRACTION_FAILED` (per page),
-`VISUAL_ANALYSIS_FAILED` (per page, from M2).
+`VISUAL_ANALYSIS_FAILED` (per page: render error, timeout, refusal, invalid output, model
+unavailable, or no elements returned for a page that stage 1 knows has visual content).
 
 ### Internal pipeline records (not API output) — `app/schemas/extraction.py`
 
@@ -61,11 +62,40 @@ definitions are in `CLAUDE.md` section 8.
 (0–1, used for ranking), `selected_for_visual_analysis`.
 `ExtractedDocument`: `page_count`, `pages`, `warnings`.
 
+### `Citation` — `app/schemas/common.py`
+
+`{document_id: string, page: int (1-based)}`. Used by the consolidated report and triage (M3, M7).
+
+### `VisualElement` — `app/schemas/visual.py`
+
+One visual element on a page, produced by stage 2. Every field is AI-generated.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `page` | `int` | 1-based page (set by the pipeline, not the model) |
+| `type` | `"photo" \| "chart" \| "table" \| "diagram" \| "map" \| "scanned_text"` | Decorative items are dropped |
+| `description` | `string` | Factual description |
+| `observations` | `string[]` | Only what is directly visible (max 25) |
+| `possible_inferences` | `{inference, basis}[]` | Conclusions beyond what is visible, each with its visible evidence |
+| `information_gaps` | `string[]` | What cannot be determined from the image |
+| `table_markdown` | `string \| null` | Only for `table` |
+| `chart` | `ChartDetails \| null` | Only for `chart`: `chart_type`, `x_axis`, `y_axis`, `key_values[]` ("label: value"), `trend`. **Addition to the spec** (DECISIONS D-026) |
+| `transcription` | `string \| null` | Only for `scanned_text`. **Addition to the spec** (D-026) |
+| `sensitive_content` | `{graphic: bool, pii_visible: PiiCategory[]}` | `graphic` collapses the item in the UI. `pii_visible` lists categories only: `face`, `licence_plate`, `identity_document`, `name`, `phone_number`, `address`, `signature`, `other` |
+| `ai_generated` | `true` | Always true |
+
+Text fields are PII-masked when `MASK_PII=true` (default).
+
+**Model-facing schema (internal):** the model fills `VisualPageModelOutput`
+(`instructions_to_ai_present: bool`, `elements: VisualElementModelOutput[]`,
+`declined_reason: string | null`). Its JSON schema is sent as Ollama's `format`. The pipeline
+maps it onto `VisualElement` (D-026).
+
 ## Planned (to be documented as implemented)
 
 | Schema | Milestone |
 |---|---|
-| `Citation`, `Entity`, `NotablePoint`, `VisualElement` | M2 |
+| `Entity`, `NotablePoint` | M3 |
 | `DocumentAnalysis` (core) | M3 |
 | `ConsolidatedReport` | M3 |
 | `IncidentExtension` | M6 |

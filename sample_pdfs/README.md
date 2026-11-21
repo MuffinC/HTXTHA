@@ -19,6 +19,15 @@ Openly licensed images only (for example Wikimedia Commons). Each image needs an
 |---|---|---|---|
 | _(author to supply or approve)_ | | | |
 
+## `backend/tests/assets/` — images used by tests
+
+Used only by the live-model tests (`pytest -m ollama`) and `scripts/benchmark_vision.py`, through
+`pdf_factory.real_photo_pdf()`. The unit tests use generated solid-colour images.
+
+| File | Source URL | Author | Licence | Changes |
+|---|---|---|---|---|
+| `car_crash_1.jpg` | <https://commons.wikimedia.org/wiki/File:Car_crash_1.jpg> | Thue (Wikimedia Commons user), 2005 | Public domain (released by the author) | Downscaled from 2048×1536 to 1024×768 and re-encoded as JPEG, which removes the camera EXIF data |
+
 ## `general/` — real public documents
 
 | File | Source URL | Licence | Description |

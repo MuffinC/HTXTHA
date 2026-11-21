@@ -20,9 +20,11 @@ class Settings(BaseSettings):
 
     # ---- LLM ----
     llm_provider: Literal["ollama", "mock"] = "ollama"
+    # Docker Compose hostname. For local development against a natively
+    # installed Ollama, set OLLAMA_BASE_URL=http://127.0.0.1:11434 (ASSUMPTIONS A-112).
     ollama_base_url: str = "http://ollama:11434"
-    # ASSUMPTION: the default tag is verified against the Ollama registry in M2
-    # (see docs/ASSUMPTIONS.md).
+    # Verified in M2 against Ollama 0.40.16 (DECISIONS D-023): vision-capable,
+    # non-thinking instruct variant, Q4_K_M, 3.3 GB.
     ollama_model: str = "qwen3-vl:4b-instruct"
     ollama_num_ctx: int = Field(default=16384, gt=0)
     llm_timeout_seconds: float = Field(default=300, gt=0)
@@ -38,6 +40,10 @@ class Settings(BaseSettings):
 
     # ---- Security / retention ----
     active_content_policy: Literal["reject", "warn"] = "reject"
+    # Backstop regex masking of NRIC/FIN and phone numbers in model output.
+    # Trade-off (DECISIONS D-021): masking protects against leaks, but can hide
+    # contact details an investigator legitimately needs. Inference is local.
+    mask_pii: bool = True
     retain_uploads: bool = False
 
     # ---- Ops ----
