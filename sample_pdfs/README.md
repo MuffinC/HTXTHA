@@ -62,9 +62,53 @@ Used only by the live-model tests (`pytest -m ollama`) and `scripts/benchmark_vi
 
 ## `general/` — real public documents
 
-| File | Source URL | Licence | Description |
-|---|---|---|---|
-| _(author to supply)_ | | | |
+Real documents for the General profile. All three are works of the US federal government and
+are in the public domain (17 U.S.C. § 105). Each file's size was checked against what its
+source URL serves.
+
+| File | Publisher | Source URL | Licence | Description |
+|---|---|---|---|---|
+| `HAB1801.pdf` | National Transportation Safety Board (NTSB) | <https://www.ntsb.gov/investigations/AccidentReports/Reports/HAB1801.pdf> | US federal government work, public domain | Highway Accident Brief NTSB/HAB-18/01 (2018): rear-end crash of a truck-tractor semitrailer and an SUV, Goodland, Kansas, 29 June 2016. 10 pages: narrative, a table, a location map, an aerial view, a collision diagram and two photos of the damaged vehicles. Byte-identical to the source (490,907 bytes). |
+| `Overview of Motor Vehicle Traffic Crashes in 2023.pdf` | National Highway Traffic Safety Administration (NHTSA), National Center for Statistics and Analysis | <https://crashstats.nhtsa.dot.gov/Api/Public/ViewPublication/813705> | US federal government work, public domain | Traffic Safety Facts Research Note DOT HS 813 705 (April 2025). 15 pages: national crash statistics with long-run trend charts (fatalities and rates since 1975), tables and a state map. |
+| `Overview of Motor Vehicle Traffic Crashes in 2024.pdf` | NHTSA, National Center for Statistics and Analysis | <https://crashstats.nhtsa.dot.gov/Api/Public/ViewPublication/813791> | US federal government work, public domain | Traffic Safety Facts Research Note DOT HS 813 791 (April 2026). Same structure as the 2023 note, one year later, so the two can be compared. |
+
+**Third-party content.** In `HAB1801.pdf`, Figure 2 (aerial view of the crash location) is
+credited "Source: Google Earth modified". That imagery belongs to Google and its imagery
+providers and is not covered by the federal public-domain status; it is included here only as
+part of the unmodified NTSB document. Figure 1 (location map) carries no credit. Figures 3–5
+(the NTSB collision diagram and two investigation photos) carry no third-party credit. The
+NHTSA notes' "Source: FARS …" lines name the data source of each chart, not an image owner.
+
+**How the NHTSA files were obtained.** NHTSA's publication endpoint serves each PDF wrapped in
+an HTTP multipart envelope (`------WebKitFormBoundary…` headers before the `%PDF-` header, and
+a closing boundary after `%%EOF`). PDF viewers tolerate this, and since D-074 so does this app: a
+header within the first 1024 bytes is accepted, the leading bytes are stripped and a
+`LEADING_BYTES_IGNORED` warning says how many. The committed copies have the envelope removed and nothing
+else changed: the PDF bytes are exactly the part between the envelope headers (1,885,653 →
+1,885,458 bytes and 1,821,706 → 1,821,511 bytes), and both open in PyMuPDF without repair.
+
+Expected results (default settings; live run of 22 Nov 2026 after D-074 to D-076):
+
+| File | Upload validation | Pipeline |
+|---|---|---|
+| `HAB1801.pdf` | **Accepted** | 4 visual pages (map, aerial photo, diagram, two photos); fits the context; no warnings |
+| `Overview … 2023.pdf` | **Accepted** with an `ACTIVE_CONTENT` warning: Acrobat attached its export settings (`Safety In Numbers (SIN).joboptions`) as an embedded file, which is never extracted (D-075) | 8 visual pages; map-reduce (2 chunks); `VISUAL_NOT_DESCRIBED` notes on pages 1, 14 and 15 (masthead banner and shaded text boxes, correctly empty: L-022) |
+| `Overview … 2024.pdf` | **Accepted** | 8 visual pages; map-reduce (2 chunks); `VISUAL_NOT_DESCRIBED` notes on pages 1, 14 and 15 (as above); `VISUAL_ANALYSIS_FAILED` on page 9 (Venn diagram: model output invalid twice) |
+
+As downloaded from NHTSA (multipart-wrapped), each note is also accepted, with a
+`LEADING_BYTES_IGNORED` warning (149 bytes ignored; the other 46 bytes of the envelope, after `%%EOF`, are ignored by the parser) (D-074).
+
+## Referenced, not included
+
+Linked rather than committed, because their reuse terms have not been confirmed. Relevant as
+examples of the statistical reporting the app could analyse for a Singapore audience.
+
+| Document | Publisher | Link |
+|---|---|---|
+| Annual Road Traffic Situation 2025 | Singapore Police Force | <https://www.police.gov.sg/-/media/SPF/Media-Room/Statistics/Annual-Road-Traffic-Situation-2025/Annual-Road-Traffic-Situation-2025.pdf> |
+| Mid-Year Road Traffic Situation 2026 | Singapore Police Force | <https://www.police.gov.sg/-/media/SPF/Media-Room/Statistics/Mid-Year-Road-Traffic-Situation-2026/Mid-Year-Road-Traffic-Situation-2026.pdf> |
+
+These links were not opened or tested in this project, and no copy is committed.
 
 ## `adversarial/` — security test files
 

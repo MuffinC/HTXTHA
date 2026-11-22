@@ -65,9 +65,33 @@ def test_unsupported_type(settings: Settings) -> None:
     _rejected(validate_file("fake.pdf", pdfs.fake_pdf(), settings), ErrorCode.UNSUPPORTED_TYPE)
 
 
-def test_pdf_header_must_be_at_the_start(settings: Settings) -> None:
-    data = b"junk before header\n" + pdfs.valid_text_pdf()
-    _rejected(validate_file("x.pdf", data, settings), ErrorCode.UNSUPPORTED_TYPE)
+def test_wrapped_pdf_is_accepted_with_the_ignored_bytes_reported(settings: Settings) -> None:
+    # D-074: a multipart envelope before %PDF- (as NHTSA serves its reports).
+    inner = pdfs.valid_text_pdf()
+    data = pdfs.multipart_wrapped_pdf(inner)
+    offset = data.index(b"%PDF-")
+
+    result = validate_file("x.pdf", data, settings)
+
+    assert isinstance(result, AcceptedFile)
+    assert result.header_offset == offset > 0
+    assert data[result.header_offset :].startswith(inner)  # what the caller stores
+    [warning] = result.warnings
+    assert warning.code is WarningCode.LEADING_BYTES_IGNORED
+    assert f"{offset} bytes before the PDF header were ignored" in warning.message
+
+
+def test_header_at_the_start_needs_no_warning(settings: Settings) -> None:
+    result = validate_file("x.pdf", pdfs.valid_text_pdf(), settings)
+    assert isinstance(result, AcceptedFile)
+    assert result.header_offset == 0 and result.warnings == []
+
+
+def test_header_must_start_within_the_first_1024_bytes(settings: Settings) -> None:
+    inside = b"x" * 1023 + pdfs.valid_text_pdf()  # header starts at byte 1023
+    outside = b"x" * 1024 + pdfs.valid_text_pdf()  # header starts at byte 1024
+    assert isinstance(validate_file("x.pdf", inside, settings), AcceptedFile)
+    _rejected(validate_file("x.pdf", outside, settings), ErrorCode.UNSUPPORTED_TYPE)
 
 
 def test_file_too_large(make_settings: Callable[..., Settings]) -> None:
@@ -106,14 +130,33 @@ def test_empty_document(settings: Settings) -> None:
     [
         (pdfs.javascript_pdf, "JavaScript"),
         (pdfs.launch_action_pdf, "launch action"),
-        (pdfs.embedded_file_pdf, "embedded file"),
     ],
 )
-def test_active_content_rejected_by_default(
+def test_executable_active_content_rejected_by_default(
     settings: Settings, builder: Callable[[], bytes], label: str
 ) -> None:
     result = _rejected(validate_file("x.pdf", builder(), settings), ErrorCode.ACTIVE_CONTENT)
     assert label in result.message
+
+
+def test_embedded_file_accepted_with_warning_by_default(settings: Settings) -> None:
+    # D-075: attachments are never extracted or opened, so the default is warn.
+    result = validate_file("x.pdf", pdfs.embedded_file_pdf(), settings)
+
+    assert isinstance(result, AcceptedFile)
+    [warning] = result.warnings
+    assert warning.code is WarningCode.ACTIVE_CONTENT
+    assert "embedded file" in warning.message and "not executed or extracted" in warning.message
+
+
+def test_embedded_file_rejected_when_policy_is_reject(
+    make_settings: Callable[..., Settings],
+) -> None:
+    settings = make_settings(embedded_file_policy="reject")
+    result = _rejected(
+        validate_file("x.pdf", pdfs.embedded_file_pdf(), settings), ErrorCode.ACTIVE_CONTENT
+    )
+    assert "embedded file" in result.message
 
 
 def test_active_content_warn_policy_accepts_with_warning(
@@ -172,3 +215,9 @@ def test_sanitize_filename_caps_length_and_keeps_extension() -> None:
     name = sanitize_filename("a" * 500 + ".pdf")
     assert len(name) == 200
     assert name.endswith(".pdf")
+
+
+def test_text_that_mentions_the_header_is_not_a_pdf(settings: Settings) -> None:
+    # The fake PDF's text contains "%PDF-." but no versioned header.
+    data = b"Notes about the format: every file starts with %PDF- and a version.\n"
+    _rejected(validate_file("x.pdf", data, settings), ErrorCode.UNSUPPORTED_TYPE)

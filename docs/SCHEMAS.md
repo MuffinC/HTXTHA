@@ -35,14 +35,14 @@ checked against real API output by the typed fixtures in `frontend/src/test/fixt
 
 | `code` | HTTP | Raised when |
 |---|---|---|
-| `UNSUPPORTED_TYPE` | per file | Content does not start with `%PDF-` (extension and MIME ignored) |
+| `UNSUPPORTED_TYPE` | per file | No PDF header (`%PDF-` plus a version) starts within the first 1024 bytes (extension and MIME ignored). Bytes before a header are stripped, with a `LEADING_BYTES_IGNORED` warning (D-074) |
 | `FILE_TOO_LARGE` | per file | Larger than `MAX_FILE_MB` (25) |
 | `TOO_MANY_FILES` | 400 | More than `MAX_FILES` (10) in one upload |
 | `TOO_MANY_PAGES` | per file | More than `MAX_PAGES` (60) |
 | `CORRUPT_PDF` | per file | PyMuPDF cannot open it, or it has 0 pages |
 | `ENCRYPTED_PDF` | per file | A password is required to open it |
 | `EMPTY_DOCUMENT` | per file | No text, images or drawings on any page |
-| `ACTIVE_CONTENT` | per file | JavaScript, launch action or embedded file, with `ACTIVE_CONTENT_POLICY=reject` |
+| `ACTIVE_CONTENT` | per file | JavaScript or a launch action (with `ACTIVE_CONTENT_POLICY=reject`, the default), or an embedded file (only with `EMBEDDED_FILE_POLICY=reject`; the default is `warn`) (D-075) |
 | `NO_VALID_FILES` | 400 | Every file in an upload was rejected; `details.rejected[]` lists each file |
 | `UNSUPPORTED_PROFILE` | 400 | Profile exists but is not available yet (`details.available`) |
 | `VALIDATION_ERROR` | 422 | Malformed request; `details.errors[]` has `loc`, `msg` and `type`, but never the submitted value |
@@ -63,10 +63,14 @@ The `413 FILE_TOO_LARGE` variant is returned when a request's total `Content-Len
 | `message` | `string` | Human-readable. Never contains attacker-controlled text |
 | `page` | `int \| null` | 1-based page, when the warning is page-specific |
 
-`WarningCode`: `INJECTION_SUSPECTED` (per page), `ACTIVE_CONTENT` (only with policy `warn`),
+`WarningCode`: `INJECTION_SUSPECTED` (per page), `ACTIVE_CONTENT` (an accepted file with an
+embedded file, or any active content under policy `warn`), `LEADING_BYTES_IGNORED` (bytes before
+the PDF header were stripped; the message gives the count),
 `VISUAL_PAGES_CAPPED` (lists the skipped pages), `TABLE_EXTRACTION_FAILED` (per page),
 `VISUAL_ANALYSIS_FAILED` (per page: render error, timeout, refusal, invalid output, model
-unavailable, or no elements returned for a page that stage 1 knows has visual content),
+unavailable, or no elements returned for a page that stage 1 knows has visual content *and*
+that is flagged for injection), `VISUAL_NOT_DESCRIBED` (info: no elements returned for a page
+flagged as visual, with no injection signal; shown as a note, D-076),
 `CITATIONS_REMOVED` (the model cited pages or documents that do not exist; they were removed),
 `CONTENT_TRUNCATED` (text was cut to fit the model's context; per page when page-specific).
 

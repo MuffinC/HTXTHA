@@ -13,6 +13,8 @@ class AcceptedFile(BaseModel):
     size_bytes: int
     page_count: int
     warnings: list[DocumentWarning] = Field(default_factory=list)
+    #: Where ``%PDF-`` starts. Bytes before it are dropped before storage (D-074).
+    header_offset: int = 0
 
 
 class RejectedFile(BaseModel):

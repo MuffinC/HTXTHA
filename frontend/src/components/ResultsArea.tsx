@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { Citation, JobResponse } from "../api/types";
-import { WARNING_INFO, plural } from "../lib/labels";
+import { WARNING_INFO, isNote, plural } from "../lib/labels";
 import { CitationContext, type JobDocs } from "../lib/citations";
 import { JobActionsContext } from "../lib/jobActions";
 import { PageDrawer } from "./Citations";
@@ -160,7 +160,8 @@ export function ResultsArea({
         ]
       : []),
     ...completed.map((d) => {
-      const warnings = d.analysis?.warnings ?? [];
+      // Info-level notes do not badge the tab; only real warnings do (D-076).
+      const warnings = (d.analysis?.warnings ?? []).filter((w) => !isNote(w.code));
       return {
         id: d.document_id,
         label: `${docs.byId.get(d.document_id)?.label} ${d.filename}`,

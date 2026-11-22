@@ -273,6 +273,24 @@ async def test_uploads_kept_when_retain_uploads(make_settings: Any, tmp_path: Pa
     assert stored.name == f"{created['accepted'][0]['document_id']}.pdf"  # UUID, not "a.pdf"
 
 
+async def test_wrapped_pdf_is_stored_from_its_header(make_settings: Any, tmp_path: Path) -> None:
+    # D-074: the bytes before %PDF- are never stored, and the job completes with a warning.
+    inner = pdf_factory.valid_text_pdf()
+    async with app_client(create_app(make_settings(retain_uploads=True))) as client:
+        created = (
+            await _upload(client, [("w.pdf", pdf_factory.multipart_wrapped_pdf(inner))])
+        ).json()
+        job = await _wait(client, created["job_id"])
+    [accepted] = created["accepted"]
+    assert [w["code"] for w in accepted["warnings"]] == ["LEADING_BYTES_IGNORED"]
+    [stored] = list((tmp_path / "uploads").iterdir())
+    assert stored.read_bytes().startswith(b"%PDF-")
+    assert stored.read_bytes()[: len(inner)] == inner
+    assert job["status"] == "completed"
+    warnings = job["documents"][0]["analysis"]["warnings"]
+    assert "LEADING_BYTES_IGNORED" in [w["code"] for w in warnings]
+
+
 async def test_logs_carry_ids_and_no_document_content(
     make_settings: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -316,6 +334,7 @@ async def test_config_exposes_upload_limits_from_settings(make_settings: Any) ->
         "max_pages",
         "max_visual_pages_per_doc",
         "active_content_policy",
+        "embedded_file_policy",
         "mask_pii",
         "retain_uploads",
     }  # nothing sensitive (URLs, paths, model internals) leaks

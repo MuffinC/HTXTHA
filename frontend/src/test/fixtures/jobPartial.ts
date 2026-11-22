@@ -107,7 +107,7 @@ const fixture: JobResponse = {
       "page_count": null,
       "error": {
         "code": "UNSUPPORTED_TYPE",
-        "message": "This file is not a PDF (its content does not start with a PDF header), whatever its extension says. Only PDF files are supported."
+        "message": "This file is not a PDF (no PDF header in its first 1024 bytes), whatever its extension says. Only PDF files are supported."
       },
       "analysis": null
     }

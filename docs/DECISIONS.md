@@ -1422,6 +1422,153 @@ All tunable values are named constants at the top of `incident_rules.py`.
   T4 P3, T5 P1 by rule; group T1–T3 P2.
 - **Milestone:** M9
 
+## D-073 First real-world documents (General profile, one live run)
+
+- **Documents:** `sample_pdfs/general/`: NTSB Highway Accident Brief HAB-18/01 (10 pages) and
+  NHTSA Research Notes DOT HS 813 705 and 813 791 (15 pages each). One job, General profile,
+  native Ollama, clean GPU state, `ACTIVE_CONTENT_POLICY=warn` (see below). **300 s** for the
+  three documents (40 pages, 20 of them sent to visual analysis). All three completed.
+- **Before any model call (the validator worked as specified, and both findings matter):**
+  1. NHTSA's publication endpoint serves its PDFs wrapped in an HTTP multipart envelope
+     (`------WebKitFormBoundary…` before `%PDF-`). Viewers tolerate it; the validator requires
+     `%PDF-` at byte 0 (CLAUDE.md section 7), so both downloads were rejected with
+     `UNSUPPORTED_TYPE`. The committed copies have the envelope stripped and are otherwise
+     byte-exact (sample_pdfs/README.md). The rule was not relaxed: that is a spec decision
+     (L-024).
+  2. The 2023 note carries an embedded `.joboptions` file (Acrobat export settings, harmless).
+     The detector found it through the object scan even though the attachment tree is empty,
+     and the default `reject` policy rejects the file (L-025). The run used `warn`.
+- **Limits:** the visual-page cap (20) was not reached (4, 8 and 8 pages). Both NHTSA notes
+  exceeded the stage-3 context budget and used **map-reduce** (2 chunks each). No page was
+  truncated (`CONTENT_TRUNCATED` not raised).
+- **Chart reading (NHTSA trend charts), checked against the values printed in each chart's
+  text layer and the reports' own percentages:**
+  - Figures 1–2 (fatalities and rate since 1975; injuries and rate since 1988), both years:
+    every value the model reported was exact (44,525 → 40,901 / 39,254; 3.35 → 1.26 / 1.19;
+    3,427,486 → 2,442,581 / 2,422,195; 169 → 75 / 74). One year label was wrong: the 1975
+    value was given as 1976, the first labelled tick.
+  - Rural/urban fatalities, 10 years × 2 series: 8 of 10 years exact; in the two years where
+    the lines cross (2014–2015 in the 2023 note, 2015 in the 2024 note) the model **swapped
+    the two series**, so its figures show urban above rural throughout. The 2024 reading also
+    dropped the years from its values.
+  - Pie charts (2023): all ten proportions exact. In 2024 the same figure was typed `diagram`
+    rather than `chart`, with partial values.
+  - Inside/outside proportions: end values right (63/37 %, 62/38 %); one peak year off by one
+    (1995 for 1996).
+  - Venn diagram (2024, page 9): the model's output was invalid twice; the page got
+    `VISUAL_ANALYSIS_FAILED` and the document continued.
+  - State maps: correctly typed `map`, with the national total and legend read correctly; no
+    per-state values were extracted.
+- **Photo descriptions (NTSB brief):** the map, the aerial view (including its "Google Earth
+  modified" credit) and the collision diagram were described accurately. The two vehicle
+  photos are described correctly as far as they can be seen (front-end damage, exposed
+  radiator, caution tape, a workshop setting), but their "observations" also include facts
+  that are only in the surrounding page text (a deformed rear frame rail, intact driver
+  controls). The left doors, which the text says were removed, are described as "open", and
+  an unreadable door logo was transcribed as "REHAB" (L-023).
+- **Warnings:** `ACTIVE_CONTENT` (2023, policy `warn`); `VISUAL_ANALYSIS_FAILED` on pages 1, 14
+  and 15 of both notes and page 9 of the 2024 note. The pages 1, 14 and 15 warnings are false
+  alarms: they are a masthead banner and text in shaded boxes, the model correctly found no
+  visual element, and stage 1 had flagged them (L-022). No injection, PII or citation
+  warnings. The consolidated report found no contradictions, which is right for these
+  documents.
+- **Not tuned:** per the brief for this run, quality issues are recorded as limitations
+  (L-022 to L-025), not prompt changes.
+- **Milestone:** post-M9 follow-up
+
+## D-074 PDF header within the first 1024 bytes; leading bytes stripped
+
+- **Decision (author, after D-073):** accept a PDF whose header starts within the first 1024
+  bytes, the window PDF viewers accept. CLAUDE.md section 7 was updated.
+- **How:**
+  - `find_pdf_header` looks for `%PDF-` followed by a version (`%PDF-1.7`, `%PDF-2.0`). The
+    version is required so that a text file that merely mentions "%PDF-" is still
+    `UNSUPPORTED_TYPE` (the `fake_pdf` sample says "…do not start with %PDF-." in its text and
+    would otherwise have been parsed).
+  - Validation parses the PDF from its header. `AcceptedFile.header_offset` tells the upload
+    route where it starts, and only `data[offset:]` is stored, so the leading bytes are never
+    stored or seen by extraction. Whatever they were (a download wrapper, or the other half of
+    a polyglot file) is discarded rather than trusted.
+  - A visible warning, `LEADING_BYTES_IGNORED`: "N bytes before the PDF header were ignored
+    (for example a download wrapper). The PDF itself was analysed from its header."
+    Trailing bytes after `%%EOF` (such as a closing multipart boundary) are left to PyMuPDF,
+    which ignores them.
+- **Tests:** a synthetic multipart-wrapped PDF (`pdf_factory.multipart_wrapped_pdf`) is
+  accepted with the warning and the right offset; through the API it completes and the stored
+  file starts at `%PDF-`; the 1024-byte boundary (header at byte 1023 accepted, at 1024
+  rejected); a text file mentioning "%PDF-" is still rejected.
+- The committed NHTSA files stay the clean, unwrapped versions (sample_pdfs/README.md).
+- **Milestone:** post-M9 follow-up
+
+## D-075 Embedded files default to warn; JavaScript and launch actions stay reject
+
+- **Decision (author, after D-073):** embedded files are dangerous only if someone opens them,
+  and this app never extracts or opens them. JavaScript and launch actions can run in a viewer.
+- **How:** two settings. `ACTIVE_CONTENT_POLICY` (default `reject`) now covers JavaScript and
+  launch actions only. New `EMBEDDED_FILE_POLICY` (default `warn`, or `reject`) covers
+  attachments. A file is rejected if any finding's policy is `reject`, and the rejection
+  message names only the rejected kinds. An accepted file with any finding carries the
+  `ACTIVE_CONTENT` warning ("…It was not executed or extracted…"), shown with the security
+  styling. Both settings are in `.env.example`, both compose files and `GET /api/config`.
+- **Tests:** JavaScript and launch actions rejected by default; an embedded file accepted with
+  the warning by default; an embedded file rejected with `EMBEDDED_FILE_POLICY=reject`;
+  JavaScript accepted with a warning under `ACTIVE_CONTENT_POLICY=warn`.
+- **Milestone:** post-M9 follow-up
+
+## D-076 Empty visual results: a warning only with an injection signal, otherwise a note
+
+- **Decision (author, after D-073 / L-022):** keep the deterministic backstop for a page that
+  stage 1 flagged as visual but where the model described nothing (D-029), but match its tone
+  to the evidence.
+  - If the page also has an `INJECTION_SUSPECTED` warning (from the text layer at stage 1, or
+    from the image at stage 2), it stays `VISUAL_ANALYSIS_FAILED` with the "may have been
+    misled by text on the page" wording. That is the case the backstop exists for: a page that
+    tells the model to return nothing.
+  - Otherwise it is a new info-level code, `VISUAL_NOT_DESCRIBED`: "No visual content was
+    described on page N; check the page if it contains a chart or image." Logged at INFO.
+- **Frontend:** info-level items are shown as notes. A banner with only notes uses the info
+  tone and says "1 note"; mixed banners say "2 warnings, 1 note" and list warnings first. Notes
+  do not badge the document tab.
+- **Tests:** backend: an empty result with no injection signal gives the note with that exact
+  wording; with the model's injection flag, or a text-layer injection warning on the page, it
+  stays a warning. Frontend: a notes-only banner, and a mixed banner with the tab badge counting
+  only the warning.
+- **Milestone:** post-M9 follow-up
+
+## D-077 Future work: crop photos instead of rendering the whole page
+
+- **Problem (L-023):** stage 2 renders the whole page (D-013), so the model also reads the page
+  text visible in the render, and facts from captions or body text can appear as photo
+  "observations". That weakens D-027 (stage 2 gets only the page image, not the page's text, so
+  that it describes what is visible): the text is still in the image when a photo shares a page
+  with narrative text. The sample tickets avoid this by putting attachments on their own
+  page; the NTSB brief (D-073) shows it.
+- **Likely fix:** for pages whose visual content is embedded images, crop the render to the
+  image regions (PyMuPDF gives each image's bounding box) and send those crops, keeping the
+  whole-page render for vector charts and scans, where the surrounding labels are part of the
+  figure. Trade-off: one call per image region rather than per page, and captions, which can
+  help interpretation, are lost.
+- **Status:** recorded, not implemented.
+- **Milestone:** future work
+
+## D-078 Re-run of the general documents under the new defaults
+
+- One live job, General profile, **default settings**, native Ollama: **338 s** for the three
+  documents (300 s in D-073; the model was already loaded both times).
+- **All three accepted.** The 2023 NHTSA note is accepted with the `ACTIVE_CONTENT` warning
+  for its `.joboptions` attachment ("…not executed or extracted…") (D-075).
+- **The false warnings are now notes.** Pages 1, 14 and 15 of both NHTSA notes give
+  `VISUAL_NOT_DESCRIBED` ("No visual content was described on page N; check the page if it
+  contains a chart or image."). None of these pages had an injection flag, so none kept the
+  warning (D-076).
+- The one remaining `VISUAL_ANALYSIS_FAILED` is the 2024 Venn diagram (page 9), where the
+  model's output was invalid twice: a real failure, correctly a warning. The NTSB brief had no
+  warnings or notes. Visual elements were the same types on the same pages as in D-073.
+- The leading-bytes path (D-074) is covered by tests with a synthetic wrapped PDF; the NHTSA
+  files are committed unwrapped, so they do not exercise it here. Validating the wrapped
+  originals locally accepts both with `LEADING_BYTES_IGNORED` (149 bytes each), and the 2023 note also with `ACTIVE_CONTENT`.
+- **Milestone:** post-M9 follow-up
+
 ---
 
 ## Pending decisions (to record when made)

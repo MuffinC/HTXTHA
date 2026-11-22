@@ -23,7 +23,7 @@ from app.pipeline.visual import (
     build_visual_request,
     page_text_with_visuals,
 )
-from app.schemas.common import WarningCode
+from app.schemas.common import DocumentWarning, WarningCode
 from app.schemas.visual import VisualElement, VisualPageModelOutput
 from tests import pdf_factory
 from tests.llm_fakes import ScriptedProvider
@@ -185,17 +185,50 @@ async def test_unavailable_model_skips_remaining_pages(make_settings: Any) -> No
         json.dumps({"elements": [{"type": "decorative", "description": "Logo"}]}),
     ],
 )
-async def test_empty_result_for_a_visual_page_is_never_silent(
+async def test_empty_result_without_injection_is_an_info_note(
     settings: Settings, output: str
 ) -> None:
-    # Stage 1 found a vector chart on the page from the PDF structure. A model that
-    # was talked into "return an empty list" must not produce a clean, empty result.
+    # D-076: stage 1 found a vector chart from the PDF structure, so an empty result is
+    # never silent. Without any injection signal on the page it is an info note, because
+    # real documents often have banners or shaded boxes where empty is correct (L-022).
     result = await _run(pdf_factory.vector_chart_pdf, ScriptedProvider([output]), settings)
 
     assert result.elements == [] and result.analysed_pages == []
+    [note] = result.warnings
+    assert note.code is WarningCode.VISUAL_NOT_DESCRIBED
+    assert note.page == 1
+    assert note.message == (
+        "No visual content was described on page 1; check the page if it contains a chart or image."
+    )
+
+
+async def test_empty_result_on_a_page_flagged_for_injection_keeps_the_warning(
+    settings: Settings,
+) -> None:
+    # D-029 / D-076: the model reports instructions to an AI on the page and returns
+    # nothing. That is the "talked into an empty list" case, so it stays a warning.
+    output = json.dumps({"instructions_to_ai_present": True, "elements": []})
+    result = await _run(pdf_factory.vector_chart_pdf, ScriptedProvider([output]), settings)
+
+    codes = [w.code for w in result.warnings]
+    assert codes == [WarningCode.INJECTION_SUSPECTED, WarningCode.VISUAL_ANALYSIS_FAILED]
+    assert "misled" in result.warnings[1].message
+
+
+async def test_empty_result_after_a_text_layer_injection_flag_keeps_the_warning(
+    settings: Settings,
+) -> None:
+    # The injection was found in the page's text layer at stage 1 (not by the model).
+    data = pdf_factory.vector_chart_pdf()
+    extracted = extract_document(data, settings)
+    extracted.warnings.append(
+        DocumentWarning(code=WarningCode.INJECTION_SUSPECTED, message="flagged", page=1)
+    )
+    result = await analyse_visuals(
+        data, extracted, "general", ScriptedProvider([json.dumps({"elements": []})]), settings
+    )
     [warning] = result.warnings
-    assert warning.code is WarningCode.VISUAL_ANALYSIS_FAILED
-    assert "misled" in warning.message
+    assert warning.code is WarningCode.VISUAL_ANALYSIS_FAILED and "misled" in warning.message
 
 
 async def test_model_flag_for_instructions_raises_injection_warning(settings: Settings) -> None:

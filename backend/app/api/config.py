@@ -23,6 +23,7 @@ class ConfigResponse(BaseModel):
     max_pages: int
     max_visual_pages_per_doc: int
     active_content_policy: Literal["reject", "warn"]
+    embedded_file_policy: Literal["reject", "warn"]
     mask_pii: bool
     retain_uploads: bool
 
@@ -36,6 +37,7 @@ async def get_config(settings: Settings = Depends(get_settings)) -> ConfigRespon
         max_pages=settings.max_pages,
         max_visual_pages_per_doc=settings.max_visual_pages_per_doc,
         active_content_policy=settings.active_content_policy,
+        embedded_file_policy=settings.embedded_file_policy,
         mask_pii=settings.mask_pii,
         retain_uploads=settings.retain_uploads,
     )

@@ -8,6 +8,7 @@ const fixture: ConfigResponse = {
   "max_pages": 60,
   "max_visual_pages_per_doc": 20,
   "active_content_policy": "reject",
+  "embedded_file_policy": "warn",
   "mask_pii": true,
   "retain_uploads": false
 };

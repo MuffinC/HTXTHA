@@ -249,3 +249,28 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - L-021: No page images. A citation chip opens a drawer listing everything the analysis says
   about that page, but the page itself is not rendered (M8 skipped, DECISIONS D-069). To see
   the original, the analyst opens the PDF at the cited page.
+- L-022: Stage-1 visual detection over-flags real documents: a large masthead banner image and
+  text set in grey shaded boxes (vector rectangles) are sent to visual analysis, and the model
+  correctly finds nothing there. In the NHTSA notes this happened on 3 pages per document and
+  used 3 of the visual-page budget (D-073). **Mitigated (D-076):** the empty result is now an
+  info-level note ("No visual content was described on page N…") unless the page is also
+  flagged for injection, so it no longer reads as a failure. The over-flagging itself, and the
+  wasted model calls, remain.
+- L-023: Photo "observations" can include facts from the page text around the photo. **Cause:**
+  whole-page rendering (D-013): the model reads any page text visible in the render, such as
+  captions and body text. On the NTSB brief, details stated only in the text (a deformed frame
+  rail, intact controls) appeared as observations of the photo, and an unreadable logo was
+  transcribed (D-073). This weakens D-027 (stage 2 is sent only the page image, not its text):
+  the text is still visible inside the image when a photo shares a page with narrative text; the sample tickets avoid this by putting attachments on a
+  page of their own. **Future work (D-077):** crop the render to the embedded-image regions for
+  photo pages. Not implemented.
+- L-024: Real files can carry bytes before the PDF header: NHTSA's publication endpoint serves
+  its PDFs inside an HTTP multipart envelope (D-073). **Resolved (D-074):** a header within the
+  first 1024 bytes is accepted, the leading bytes are stripped before storage and processing,
+  and a `LEADING_BYTES_IGNORED` warning states how many were ignored. A header further in is
+  still rejected (`UNSUPPORTED_TYPE`).
+- L-025: Real PDFs carry harmless attachments: Acrobat can attach its export settings
+  (`.joboptions`), as in the 2023 NHTSA note (D-073). **Resolved (D-075):** embedded files now
+  default to `warn` (`EMBEDDED_FILE_POLICY`) and are never extracted or opened; JavaScript and
+  launch actions still default to `reject`. A deployment that must refuse attachments can set
+  `EMBEDDED_FILE_POLICY=reject`.

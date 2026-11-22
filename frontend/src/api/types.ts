@@ -17,9 +17,11 @@ export interface Citation {
 export type WarningCode =
   | 'INJECTION_SUSPECTED'
   | 'ACTIVE_CONTENT'
+  | 'LEADING_BYTES_IGNORED'
   | 'VISUAL_PAGES_CAPPED'
   | 'TABLE_EXTRACTION_FAILED'
   | 'VISUAL_ANALYSIS_FAILED'
+  | 'VISUAL_NOT_DESCRIBED'
   | 'CITATIONS_REMOVED'
   | 'CONTENT_TRUNCATED'
   | 'INCIDENT_EXTRACTION_FAILED';
@@ -50,7 +52,10 @@ export interface ConfigResponse {
   max_file_mb: number;
   max_pages: number;
   max_visual_pages_per_doc: number;
+  /** JavaScript and launch actions. */
   active_content_policy: 'reject' | 'warn';
+  /** Embedded files (attachments); never extracted. */
+  embedded_file_policy: 'reject' | 'warn';
   mask_pii: boolean;
   retain_uploads: boolean;
 }

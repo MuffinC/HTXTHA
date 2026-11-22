@@ -348,6 +348,23 @@ def embedded_file_pdf() -> bytes:
     return _save(doc)
 
 
+def multipart_wrapped_pdf(inner: bytes | None = None) -> bytes:
+    """A PDF wrapped in an HTTP multipart envelope, as NHTSA's endpoint serves them (D-074).
+
+    The envelope adds header lines before ``%PDF-`` and a closing boundary after
+    ``%%EOF``. Returns the wrapped bytes; the PDF inside is ``inner`` (or a valid
+    text PDF).
+    """
+    pdf = inner if inner is not None else valid_text_pdf()
+    boundary = b"------WebKitFormBoundarySYNTHETICtest01"
+    head = (
+        boundary
+        + b'\r\nContent-Disposition: form-data; name="report.pdf"; filename="report.pdf"'
+        + b"\r\nContent-Type: application/pdf\r\n\r\n"
+    )
+    return head + pdf + b"\r\n" + boundary + b"--\r\n"
+
+
 def goto_open_action_pdf() -> bytes:
     """A benign /OpenAction that only jumps to page 1 (no script): must NOT be flagged."""
     doc = _new_doc()

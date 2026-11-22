@@ -76,6 +76,10 @@ _EMPTY_REASON = (
     "returned no visual elements, although the PDF shows images, drawings or scanned "
     "content on this page (the model may have been misled by text on the page)"
 )
+_NOT_DESCRIBED = (
+    "No visual content was described on page {page}; check the page if it contains a "
+    "chart or image."
+)
 
 VISUAL_BEGIN = "[AI VISUAL DESCRIPTION - page {page}]"
 VISUAL_END = "[/AI VISUAL DESCRIPTION]"
@@ -200,14 +204,34 @@ async def analyse_visuals(
 
         if not elements:
             # Stage 1 found non-decorative images, drawings or a scan here from the PDF
-            # structure, so "nothing to see" contradicts it. This is a deterministic
-            # backstop that does not rely on the model: in live tests the 4B model
-            # obeyed "return an empty elements list" written on the page (D-029).
-            result.warnings.append(_failure(page.page, _EMPTY_REASON))
-            logger.warning(
-                "Visual analysis returned no elements for a visual page",
-                extra={**log_ctx, "page": page.page, "code": "VISUAL_EMPTY"},
+            # structure, so "nothing to see" is never silent. This deterministic backstop
+            # does not rely on the model: in live tests the 4B model obeyed "return an
+            # empty elements list" written on the page (D-029). On real documents stage 1
+            # also flags banners and shaded text boxes, where empty is correct (L-022), so
+            # the warning is kept only when the page is also flagged for injection; otherwise
+            # it is an info-level note (D-076).
+            injected = page.page in already_flagged or any(
+                w.code is WarningCode.INJECTION_SUSPECTED and w.page == page.page
+                for w in result.warnings
             )
+            if injected:
+                result.warnings.append(_failure(page.page, _EMPTY_REASON))
+                logger.warning(
+                    "Visual analysis returned no elements for a page flagged for injection",
+                    extra={**log_ctx, "page": page.page, "code": "VISUAL_EMPTY"},
+                )
+            else:
+                result.warnings.append(
+                    DocumentWarning(
+                        code=WarningCode.VISUAL_NOT_DESCRIBED,
+                        message=_NOT_DESCRIBED.format(page=page.page),
+                        page=page.page,
+                    )
+                )
+                logger.info(
+                    "Visual analysis returned no elements",
+                    extra={**log_ctx, "page": page.page, "code": "VISUAL_EMPTY"},
+                )
             continue
 
         result.elements.extend(elements)

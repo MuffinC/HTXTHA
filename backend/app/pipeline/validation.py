@@ -6,6 +6,10 @@ and stop at the first failure:
 
     size -> magic bytes -> parse -> encryption -> page count -> active content -> emptiness
 
+The PDF header may start anywhere in the first 1024 bytes, as PDF viewers allow
+(D-074). Bytes before it are ignored: validation runs on the PDF from its header,
+the caller stores only those bytes, and a warning says how many were dropped.
+
 The user's filename is only *displayed* (after sanitising) and never used in a
 filesystem path. Storage under a generated UUID is added with job storage in M3.
 """
@@ -27,6 +31,13 @@ from app.security.pdf_safety import describe_findings, find_active_content
 logger = logging.getLogger(__name__)
 
 PDF_MAGIC = b"%PDF-"
+#: The header must start within this many bytes (the window PDF viewers accept).
+HEADER_SEARCH_BYTES = 1024
+# A real header has a version ("%PDF-1.7", "%PDF-2.0"). Requiring it stops a text file
+# that merely mentions "%PDF-" from being taken for a PDF.
+_PDF_HEADER = re.compile(rb"%PDF-\d\.\d")
+#: Active-content kinds that can execute; embedded files are governed separately.
+_EXECUTABLE_KINDS = {"javascript", "launch_action"}
 MAX_DISPLAY_FILENAME = 200
 DEFAULT_FILENAME = "document.pdf"
 
@@ -101,7 +112,7 @@ def validate_file(filename: str | None, data: bytes, settings: Settings) -> File
     """
     display_name = sanitize_filename(filename)
     try:
-        page_count, warnings = _run_checks(data, settings)
+        page_count, warnings, offset = _run_checks(data, settings)
     except _Rejection as rejection:
         # Security-relevant rejections at WARNING, the rest at INFO. Filenames are
         # not logged: they can contain personal data (see ASSUMPTIONS A-105).
@@ -114,12 +125,33 @@ def validate_file(filename: str | None, data: bytes, settings: Settings) -> File
         return RejectedFile(filename=display_name, code=rejection.code, message=rejection.message)
 
     return AcceptedFile(
-        filename=display_name, size_bytes=len(data), page_count=page_count, warnings=warnings
+        filename=display_name,
+        size_bytes=len(data) - offset,
+        page_count=page_count,
+        warnings=warnings,
+        header_offset=offset,
     )
 
 
-def _run_checks(data: bytes, settings: Settings) -> tuple[int, list[DocumentWarning]]:
-    """Run all checks in order. Returns ``(page_count, warnings)`` or raises ``_Rejection``."""
+def find_pdf_header(data: bytes) -> int:
+    """Offset of a PDF header (``%PDF-`` plus a version) starting in the first 1024 bytes.
+
+    Returns:
+        The offset, or -1 if there is no header there.
+    """
+    match = _PDF_HEADER.search(data, 0, HEADER_SEARCH_BYTES + len(b"%PDF-1.7"))
+    return match.start() if match and match.start() < HEADER_SEARCH_BYTES else -1
+
+
+def _run_checks(data: bytes, settings: Settings) -> tuple[int, list[DocumentWarning], int]:
+    """Run all checks in order.
+
+    Returns:
+        ``(page_count, warnings, header_offset)``.
+
+    Raises:
+        _Rejection: On the first failed check.
+    """
     max_bytes = settings.max_file_mb * 1024 * 1024
     if len(data) > max_bytes:
         raise _Rejection(
@@ -127,18 +159,38 @@ def _run_checks(data: bytes, settings: Settings) -> tuple[int, list[DocumentWarn
             f"File is {len(data) / (1024 * 1024):.1f} MB; the limit is {settings.max_file_mb} MB.",
         )
 
-    # ASSUMPTION: the file must *start* with %PDF- (CLAUDE.md section 7). Some viewers
-    # accept junk before the header, but being strict is safer and rejects polyglots.
-    if not data.startswith(PDF_MAGIC):
+    # The header may start within the first 1024 bytes (D-074): real downloads can carry a
+    # wrapper before it (NHTSA serves PDFs inside an HTTP multipart envelope). The bytes
+    # before it are dropped, so whatever they were (a wrapper, or the other half of a
+    # polyglot) is never stored or parsed.
+    offset = find_pdf_header(data)
+    if offset < 0:
         raise _Rejection(
             ErrorCode.UNSUPPORTED_TYPE,
-            "This file is not a PDF (its content does not start with a PDF header), "
+            "This file is not a PDF (no PDF header in its first 1024 bytes), "
             "whatever its extension says. Only PDF files are supported.",
+        )
+    pdf = data[offset:]
+    warnings: list[DocumentWarning] = []
+    if offset:
+        logger.info(
+            "Bytes before the PDF header ignored",
+            extra={"event": "leading_bytes_ignored", "count": offset},
+        )
+        warnings.append(
+            DocumentWarning(
+                code=WarningCode.LEADING_BYTES_IGNORED,
+                message=(
+                    f"{offset} bytes before the PDF header were ignored (for example a "
+                    "download wrapper). The PDF itself was analysed from its header."
+                ),
+            )
         )
 
     try:
-        with open_pdf(data) as doc:
-            return _check_document(doc, settings)
+        with open_pdf(pdf) as doc:
+            page_count, doc_warnings = _check_document(doc, settings)
+            return page_count, warnings + doc_warnings, offset
     except PdfOpenError as exc:
         raise _Rejection(
             ErrorCode.CORRUPT_PDF, "The PDF is damaged or unreadable and could not be opened."
@@ -176,17 +228,26 @@ def _check_document(doc: pymupdf.Document, settings: Settings) -> tuple[int, lis
             kinds,
             extra={"event": "security", "code": ErrorCode.ACTIVE_CONTENT.value},
         )
-        if settings.active_content_policy == "reject":
+        # JavaScript and launch actions can execute in a viewer; embedded files are only
+        # dangerous if someone opens them, and they are never extracted here (D-075).
+        rejected = [
+            f
+            for f in findings
+            if (f.kind in _EXECUTABLE_KINDS and settings.active_content_policy == "reject")
+            or (f.kind == "embedded_file" and settings.embedded_file_policy == "reject")
+        ]
+        if rejected:
             raise _Rejection(
                 ErrorCode.ACTIVE_CONTENT,
-                f"The PDF contains active content ({summary}), which is not allowed.",
+                f"The PDF contains active content ({describe_findings(rejected)}), "
+                "which is not allowed.",
             )
         warnings.append(
             DocumentWarning(
                 code=WarningCode.ACTIVE_CONTENT,
                 message=(
-                    f"The PDF contains active content ({summary}). It was not executed. "
-                    "Take care when opening the original file."
+                    f"The PDF contains active content ({summary}). It was not executed or "
+                    "extracted. Take care when opening the original file."
                 ),
             )
         )

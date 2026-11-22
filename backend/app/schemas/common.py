@@ -14,10 +14,12 @@ class WarningCode(StrEnum):
     """Non-fatal problems attached to a document result and shown in the UI."""
 
     INJECTION_SUSPECTED = "INJECTION_SUSPECTED"
-    ACTIVE_CONTENT = "ACTIVE_CONTENT"  # only when ACTIVE_CONTENT_POLICY=warn
+    ACTIVE_CONTENT = "ACTIVE_CONTENT"  # embedded files (default), or any kind with policy warn
+    LEADING_BYTES_IGNORED = "LEADING_BYTES_IGNORED"  # bytes before %PDF- were stripped (D-074)
     VISUAL_PAGES_CAPPED = "VISUAL_PAGES_CAPPED"
     TABLE_EXTRACTION_FAILED = "TABLE_EXTRACTION_FAILED"
     VISUAL_ANALYSIS_FAILED = "VISUAL_ANALYSIS_FAILED"  # per page: model error/refusal/timeout
+    VISUAL_NOT_DESCRIBED = "VISUAL_NOT_DESCRIBED"  # info: empty result, no injection (D-076)
     CITATIONS_REMOVED = "CITATIONS_REMOVED"  # model cited pages/documents that do not exist
     CONTENT_TRUNCATED = "CONTENT_TRUNCATED"  # text cut to fit the model's context window
     INCIDENT_EXTRACTION_FAILED = "INCIDENT_EXTRACTION_FAILED"  # core analysis kept

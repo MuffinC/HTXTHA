@@ -90,7 +90,9 @@ async def create_job(
         result, data = await _validate_upload(upload, settings)
         document_id = str(uuid.uuid4())
         if isinstance(result, AcceptedFile):
-            await asyncio.to_thread(uploads.save, document_id, data)
+            # Bytes before the PDF header are never stored (D-074).
+            pdf = data[result.header_offset :]
+            await asyncio.to_thread(uploads.save, document_id, pdf)
             accepted.append(
                 AcceptedDocument(
                     document_id=document_id,

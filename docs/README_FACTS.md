@@ -134,7 +134,8 @@ All have safe defaults in `backend/app/config.py`; copy `.env.example` to `.env`
 | `MAX_PAGES` | `60` | Per file |
 | `MAX_VISUAL_PAGES_PER_DOC` | `20` | Pages sent to visual analysis; largest visual area first |
 | `RENDER_DPI` | `150` | Page render resolution for visual analysis (36–600) |
-| `ACTIVE_CONTENT_POLICY` | `reject` | `reject` or `warn` for JavaScript, launch actions, embedded files |
+| `ACTIVE_CONTENT_POLICY` | `reject` | `reject` or `warn` for JavaScript and launch actions |
+| `EMBEDDED_FILE_POLICY` | `warn` | `warn` or `reject` for embedded files (attachments are never extracted or opened) |
 | `MASK_PII` | `true` | Mask NRIC/FIN and phone numbers in model output |
 | `RETAIN_UPLOADS` | `false` | Keep uploaded PDFs after processing |
 | `LOG_LEVEL` | `INFO` | `DEBUG` to `CRITICAL` |
@@ -157,13 +158,13 @@ upload still proceed):
 
 | Code | Triggered by |
 |---|---|
-| `UNSUPPORTED_TYPE` | Content does not start with `%PDF-` (extension and MIME are ignored) |
+| `UNSUPPORTED_TYPE` | No PDF header (`%PDF-` plus a version) in the first 1024 bytes (extension and MIME are ignored). Leading bytes before a header are stripped with a warning |
 | `FILE_TOO_LARGE` | Larger than `MAX_FILE_MB` (25). Also 413 if the whole request exceeds `MAX_FILES × MAX_FILE_MB` + 1 MB |
 | `TOO_MANY_PAGES` | More than `MAX_PAGES` (60) |
 | `CORRUPT_PDF` | PyMuPDF cannot open it, or it has 0 pages |
 | `ENCRYPTED_PDF` | Password-protected |
 | `EMPTY_DOCUMENT` | No text, images or drawings on any page |
-| `ACTIVE_CONTENT` | JavaScript, launch action or embedded file (with `ACTIVE_CONTENT_POLICY=reject`) |
+| `ACTIVE_CONTENT` | JavaScript or a launch action (default `reject`); embedded files only with `EMBEDDED_FILE_POLICY=reject` (default `warn`) |
 
 **Request errors:**
 
@@ -189,9 +190,12 @@ upload still proceed):
 | `NO_DOCUMENT_ANALYSED` | (job) No document could be analysed |
 
 **Warnings** (shown in the UI, the document still completes): `INJECTION_SUSPECTED` (per page),
-`ACTIVE_CONTENT` (policy `warn`), `VISUAL_PAGES_CAPPED`, `TABLE_EXTRACTION_FAILED`,
-`VISUAL_ANALYSIS_FAILED`, `CITATIONS_REMOVED`, `CONTENT_TRUNCATED`,
-`INCIDENT_EXTRACTION_FAILED`.
+`ACTIVE_CONTENT` (embedded file, or any kind under policy `warn`), `LEADING_BYTES_IGNORED`,
+`VISUAL_PAGES_CAPPED`, `TABLE_EXTRACTION_FAILED`, `VISUAL_ANALYSIS_FAILED`, `CITATIONS_REMOVED`,
+`CONTENT_TRUNCATED`, `INCIDENT_EXTRACTION_FAILED`.
+
+**Notes** (info level, shown as notes, not warnings): `VISUAL_NOT_DESCRIBED` ("No visual content
+was described on page N; check the page if it contains a chart or image.").
 
 ---
 
@@ -238,6 +242,7 @@ floor); group T1–T3 P2.
 | Four tickets, incident profile (scorecard) | 77–90 s | D-060 (M6) |
 | Five tickets, incident profile, with triage | 174 s (M7); 440 s in the weapon re-run with other GPU apps open (GPU contention, D-072) | D-067, D-068 |
 | Mock stack: build + healthy / smoke job | 90 s (M9, partly cached) / 2–3 s | M9 |
+| Three real public documents, General profile (NTSB brief 10 pp + two NHTSA notes 15 pp each; 20 visual pages; map-reduce on both NHTSA notes) | **300 s** (first run, `ACTIVE_CONTENT_POLICY=warn`); **338 s** (re-run with default settings) | D-073, D-078 |
 | **Clean state** (other GPU apps closed, model 100% in VRAM): one visual page, warm | chart **2.5 s**, photo **4.5 s** (median of 3); cold 13.6 s / 10.9 s | D-072 (M9) |
 | **Clean state:** five tickets, incident profile, with triage | **117 s** | D-072 (M9) |
 
@@ -271,3 +276,7 @@ Ollama loads). Other GPUs and CPU-only machines will differ a lot (A-114, L-005)
 | L-019 | The 4B model did not raise the knife ticket in M7; now covered by the weapon rule, the model raise remains a rarely firing backstop |
 | L-020 | The weapon negation check is a word list; double negatives can flip the value |
 | L-021 | No page images: a citation opens a drawer of everything cited on that page, but not the page itself (M8 skipped) |
+| L-022 | Stage 1 over-flags masthead banners and shaded text boxes as visual; the empty result is now an info note, not a warning (mitigated) |
+| L-023 | Photo "observations" can include facts from the surrounding page text, because the whole page is rendered; cropping to image regions is future work |
+| L-024 | Bytes before the PDF header (e.g. NHTSA's multipart-wrapped downloads): now stripped with a warning if the header is within 1024 bytes (resolved) |
+| L-025 | Harmless attachments such as Acrobat `.joboptions`: embedded files now default to `warn` (resolved) |

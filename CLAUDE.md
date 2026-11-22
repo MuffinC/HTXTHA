@@ -176,14 +176,14 @@ Runs after Stage 4. Assigns a suggested priority per document using an explicit 
 
 | Code | Rule |
 |---|---|
-| `UNSUPPORTED_TYPE` | Magic bytes must start with `%PDF-`. Extension and MIME alone are not trusted. |
+| `UNSUPPORTED_TYPE` | A PDF header (`%PDF-` plus a version) must start within the first 1024 bytes. Any bytes before it are stripped before processing and a visible `LEADING_BYTES_IGNORED` warning states how many were ignored. Extension and MIME alone are not trusted. |
 | `FILE_TOO_LARGE` | > `MAX_FILE_MB` (default 25) |
 | `TOO_MANY_FILES` | > `MAX_FILES` (default 10) per upload |
 | `TOO_MANY_PAGES` | > `MAX_PAGES` (default 60) |
 | `CORRUPT_PDF` | PyMuPDF cannot open it, or it has 0 pages |
 | `ENCRYPTED_PDF` | Password-protected |
 | `EMPTY_DOCUMENT` | No text and no visual content |
-| `ACTIVE_CONTENT` | Contains JavaScript, `/Launch`, `/OpenAction` with script, or embedded files. Policy set by `ACTIVE_CONTENT_POLICY` (`reject` default, or `warn`). |
+| `ACTIVE_CONTENT` | Contains JavaScript, `/Launch` or `/OpenAction` with script: policy `ACTIVE_CONTENT_POLICY` (`reject` default, or `warn`). Embedded files: policy `EMBEDDED_FILE_POLICY` (`warn` default, or `reject`); attachments are never extracted or opened. Accepted files carry a visible `ACTIVE_CONTENT` warning. |
 
 Other rules:
 - Store uploads under a generated UUID; never use the user's filename in a filesystem path. Sanitise filenames before display.
@@ -386,7 +386,7 @@ Mock mode must work with **no Ollama at all**, e.g. via a compose profile or `do
 `docker-compose.gpu.yml` adds the NVIDIA GPU reservation to `ollama`.
 
 **Environment variables (`.env.example`, all with safe defaults)**
-`LLM_PROVIDER` (`ollama`|`mock`), `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_NUM_CTX` (default 16384), `LLM_TIMEOUT_SECONDS`, `MAX_FILES`, `MAX_FILE_MB`, `MAX_PAGES`, `MAX_VISUAL_PAGES_PER_DOC`, `RENDER_DPI`, `ACTIVE_CONTENT_POLICY`, `RETAIN_UPLOADS`, `LOG_LEVEL`, `DATA_DIR`.
+`LLM_PROVIDER` (`ollama`|`mock`), `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_NUM_CTX` (default 16384), `LLM_TIMEOUT_SECONDS`, `MAX_FILES`, `MAX_FILE_MB`, `MAX_PAGES`, `MAX_VISUAL_PAGES_PER_DOC`, `RENDER_DPI`, `ACTIVE_CONTENT_POLICY`, `EMBEDDED_FILE_POLICY`, `RETAIN_UPLOADS`, `LOG_LEVEL`, `DATA_DIR`.
 
 **Local dev without Docker**: `scripts/setup_backend.sh` and `.ps1` create a venv and install requirements. The author develops on Windows with Anaconda; also provide `backend/environment.yml` that installs from `requirements.txt`.
 

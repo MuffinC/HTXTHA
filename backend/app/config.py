@@ -42,7 +42,10 @@ class Settings(BaseSettings):
     render_dpi: int = Field(default=150, ge=36, le=600)
 
     # ---- Security / retention ----
+    # JavaScript and launch actions (D-075).
     active_content_policy: Literal["reject", "warn"] = "reject"
+    # Embedded files (attachments). Never extracted or opened; "warn" by default (D-075).
+    embedded_file_policy: Literal["reject", "warn"] = "warn"
     # Backstop regex masking of NRIC/FIN and phone numbers in model output.
     # Trade-off (DECISIONS D-021): masking protects against leaks, but can hide
     # contact details an investigator legitimately needs. Inference is local.
