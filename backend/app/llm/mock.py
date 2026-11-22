@@ -198,8 +198,8 @@ _UNCLEAR_SCENE: dict[str, Any] = {
     "weather": "unclear",
     "road_surface": "unclear",
     "vehicles_visible": "unclear",
-    "vehicle_types": [],
-    "damage_locations": [],
+    "vehicle_types": ["unclear"],
+    "damage_locations": ["unclear"],
     "traffic_signal": "unclear",
     "timestamp_visible": None,
 }

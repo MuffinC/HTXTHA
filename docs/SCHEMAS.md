@@ -202,7 +202,9 @@ after one retry), `LLM_TIMEOUT`, `LLM_UNAVAILABLE`, `LLM_REFUSED`, `INTERNAL_ERR
 `VisualElement.scene: SceneObservation | null` (**addition**; incident photos only):
 `lighting`, `weather`, `road_surface`, `vehicles_visible`, `vehicle_types[]`,
 `damage_locations[]`, `traffic_signal` (closed lists, each with `unclear`), and
-`timestamp_visible` (as shown). The model must answer every field.
+`timestamp_visible` (as shown). The model must answer every field. Both lists also allow
+`none_visible`, and the model must give at least one entry in each (D-080); results saved
+before that may have empty lists, which the UI shows as "not reported".
 
 `ConsolidatedReport` (**additions**): `possibly_related_groups` (`DocumentGroup[]`),
 `rule_based` (`true` when contradictions, agreements, timeline and groups were computed by rule)

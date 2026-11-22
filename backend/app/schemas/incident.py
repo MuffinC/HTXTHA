@@ -47,21 +47,41 @@ Confidence = Literal["low", "medium", "high"]
 # --------------------------------------------------------------------------- photo scene
 
 
+SceneVehicleType = Literal[VehicleType, "none_visible", "unclear"]
+SceneDamage = Literal[DamageLocation, "none_visible", "unclear"]
+
+
 class SceneObservation(BaseModel):
-    """Required scene fields for an incident photo. "unclear" is always allowed."""
+    """Required scene fields for an incident photo. "unclear" is always allowed.
+
+    This is the stored/API shape. Its lists may be empty, because results saved
+    before D-080 have empty lists; the UI shows an empty list as "not reported".
+    The model fills ``SceneObservationOutput`` instead, which requires an entry.
+    """
 
     lighting: Literal[Lighting, "unclear"]
     weather: Literal[Weather, "unclear"]
     road_surface: Literal[RoadSurface, "unclear"]
     vehicles_visible: Literal["none", VehicleCount, "unclear"]
-    vehicle_types: list[VehicleType] = Field(default_factory=list)
-    damage_locations: list[Literal[DamageLocation, "none_visible", "unclear"]] = Field(
-        default_factory=list
-    )
+    vehicle_types: list[SceneVehicleType] = Field(default_factory=list)
+    damage_locations: list[SceneDamage] = Field(default_factory=list)
     traffic_signal: Literal[SignalState, "not_visible", "unclear"]
     timestamp_visible: str | None = Field(
         default=None, description="Any date/time shown in the image, exactly as shown"
     )
+
+
+class SceneObservationOutput(SceneObservation):
+    """What the model must produce: both lists need at least one entry (D-080).
+
+    With an optional, empty-able list the 4B model returned ``damage_locations: []``
+    beside observations of a crushed front end, and the UI showed "Damage: none".
+    ``minItems: 1`` (enforced by Ollama while decoding) forces an answer, and
+    "none_visible" and "unclear" make every honest answer expressible.
+    """
+
+    vehicle_types: list[SceneVehicleType] = Field(min_length=1, max_length=LIST_MAX)
+    damage_locations: list[SceneDamage] = Field(min_length=1, max_length=LIST_MAX)
 
 
 # --------------------------------------------------------------------------- stated facts

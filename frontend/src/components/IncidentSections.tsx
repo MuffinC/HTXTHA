@@ -257,8 +257,12 @@ export function SceneGrid({ scene }: { scene: SceneObservation }) {
       {SCENE_ROWS.map(({ key, label }) => {
         const raw = scene[key];
         const values = Array.isArray(raw) ? raw : [raw];
-        const text = values.length ? values.map((v) => valueLabel(String(v))).join(', ') : 'none';
-        const unclear = values.every((v) => v === 'unclear') || text === 'none';
+        // An empty list means the model gave no answer, NOT "no damage" (D-080):
+        // "none visible" is its own value.
+        const text = values.length
+          ? values.map((v) => valueLabel(String(v))).join(', ')
+          : 'not reported';
+        const unclear = !values.length || values.every((v) => v === 'unclear');
         return (
           <div key={key} className={unclear ? 'is-unclear' : ''}>
             <dt>{label}</dt>

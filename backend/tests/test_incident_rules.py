@@ -369,6 +369,41 @@ def test_claims_take_corroboration_from_the_photo_checks() -> None:
     assert by_text["The driver was speeding."].note.startswith("Free-text claim")
 
 
+def test_other_claims_repeating_a_fact_quote_are_dropped() -> None:
+    # The two T4 repeats from a live run (D-080), plus near-misses that must stay.
+    stated = facts(weather="rain", injuries="none").model_dump()
+    stated["weather"]["as_written"] = "It was raining heavily and it was very dark"
+    stated["injuries"]["as_written"] = "Nobody else was involved and I was not injured."
+    ex = extraction(
+        facts=stated,
+        other_claims=[
+            # Contains the quote (different case, extra spaces, end punctuation).
+            {"claim": "it was  RAINING heavily and it was very dark at the time.", "page": 1},
+            # Contained in the quote.
+            {"claim": "Nobody else was involved", "page": 1},
+            # New information: kept.
+            {"claim": "The car skidded into a tree.", "page": 1},
+            # Shares a word with a quote, but is too short to count as a repeat: kept.
+            {"claim": "Dark", "page": 1},
+        ],
+    )
+    cleaned, dropped = r.drop_repeated_claims(ex)
+    assert dropped == 2
+    assert [c.claim for c in cleaned.other_claims] == ["The car skidded into a tree.", "Dark"]
+
+
+def test_quote_of_an_ungrounded_fact_does_not_remove_claims() -> None:
+    # Only facts still stated count: a not_mentioned fact's leftover quote is ignored.
+    unstated = facts().model_dump()
+    unstated["weather"]["as_written"] = "It was raining heavily"  # value stays not_mentioned
+    ex = extraction(
+        facts=unstated,
+        other_claims=[{"claim": "It was raining heavily", "page": 1}],
+    )
+    _, dropped = r.drop_repeated_claims(ex)
+    assert dropped == 0
+
+
 def test_claims_without_photo_say_so() -> None:
     claims = r.build_claims(
         extraction(facts=facts(weather="rain").model_dump()), {}, has_photo=False

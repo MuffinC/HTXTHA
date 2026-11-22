@@ -19,7 +19,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.incident import SceneObservation
+from app.schemas.incident import SceneObservation, SceneObservationOutput
 
 VisualType = Literal["photo", "chart", "table", "diagram", "map", "scanned_text"]
 
@@ -87,7 +87,7 @@ class IncidentVisualElementModelOutput(VisualElementModelOutput):
     """Incident profile: the scene fields are REQUIRED, so the model must answer each one
     (with "unclear" where it cannot tell). Kept only for photos when mapped."""
 
-    scene: SceneObservation
+    scene: SceneObservationOutput
 
 
 class VisualPageModelOutput(BaseModel):

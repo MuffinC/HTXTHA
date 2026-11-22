@@ -85,6 +85,13 @@ async def extract_incident(
             extra={"stage": "analysing", "event": "facts_ungrounded", "count": len(downgraded)},
         )
         extraction = extraction.model_copy(update={"facts": grounded})
+    # After grounding, so only quotes that still back a stated fact count (D-080).
+    extraction, repeated = rules.drop_repeated_claims(extraction)
+    if repeated:
+        logger.info(
+            "Other claims dropped (repeat a fact quote)",
+            extra={"stage": "analysing", "event": "claims_repeated", "count": repeated},
+        )
     if settings.mask_pii:
         extraction = IncidentExtractionOutput.model_validate(mask_pii_in(extraction.model_dump()))
 

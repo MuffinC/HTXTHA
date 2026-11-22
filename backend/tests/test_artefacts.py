@@ -7,7 +7,7 @@ import pymupdf
 import pytest
 
 from app.config import Settings
-from app.llm.artefacts import strip_markers, strip_markers_in
+from app.llm.artefacts import refers_to_system, strip_markers, strip_markers_in
 from app.llm.base import LLMTask
 from app.llm.prompts import load_prompt
 from app.pipeline.analysis import analyse_document
@@ -49,6 +49,56 @@ def test_markers_are_stripped(text: str, expected: str) -> None:
 )
 def test_ordinary_text_is_untouched(text: str) -> None:
     assert strip_markers(text) == text
+
+
+# --------------------------------------------------------------------------- prompt echoes
+
+# The exact notable point from a live T4 run (DECISIONS D-080).
+ECHO = "The document contains untrusted data and does not contain instructions to the AI system"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        ECHO,
+        "The content between the boundary markers is treated as data.",
+        "Text between the UNTRUSTED_CONTENT markers.",
+        "There are no instructions for the AI in this report.",
+    ],
+)
+def test_echoes_of_the_system_prompt_are_recognised(text: str) -> None:
+    assert refers_to_system(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The page contains instructions to the AI to ignore previous instructions.",  # injection
+        "The driver gave instructions to the passenger.",
+        "The page describes an AI system used for visual inspection.",
+        "The data were collected from untrusted sources.",
+    ],
+)
+def test_ordinary_text_is_not_an_echo(text: str) -> None:
+    assert not refers_to_system(text)
+
+
+def test_echo_items_are_dropped_and_echo_sentences_removed() -> None:
+    data = {
+        "summary": f"A car hit a tree on Upper Thomson Road. {ECHO}. Nobody else was involved.",
+        "notable_points": [
+            {"point": ECHO, "page": 1},
+            {"point": "The car hit a tree.", "page": 1},
+        ],
+        "main_topics": ["collision", "untrusted data"],
+        # A copied literal marker is cleaned, not treated as an echo: the text is kept.
+        "observations": ["<<<UNTRUSTED_CONTENT_BEGIN id=0123456789abcdef>>> Front end crushed."],
+    }
+    cleaned = strip_markers_in(data)
+    assert cleaned["summary"] == "A car hit a tree on Upper Thomson Road. Nobody else was involved."
+    assert cleaned["notable_points"] == [{"point": "The car hit a tree.", "page": 1}]
+    assert cleaned["main_topics"] == ["collision"]
+    assert cleaned["observations"] == ["Front end crushed."]
 
 
 def test_nested_strip_drops_empty_strings_from_lists() -> None:
@@ -162,6 +212,25 @@ async def test_artefact_entities_and_points_are_dropped(settings: Settings) -> N
     assert result.summary == "A collision."
     # Dropping artefacts is not a citation problem, so no CITATIONS_REMOVED warning.
     assert not [w for w in result.warnings if w.code is WarningCode.CITATIONS_REMOVED]
+
+
+async def test_echoed_notable_point_never_reaches_the_analysis(settings: Settings) -> None:
+    # The live T4 echo, end to end through the structured-output parser (D-080).
+    output = _analysis_output(
+        notable_points=[{"point": ECHO, "page": 1}, {"point": "The light was green.", "page": 1}]
+    )
+    provider = RecordingProvider({LLMTask.DOCUMENT_ANALYSIS: [output]})
+    result = await analyse_document(
+        document_id="d",
+        filename="r.pdf",
+        extracted=extract_document(pdf_factory.valid_text_pdf(2), settings),
+        visual_elements=[],
+        warnings=[],
+        profile="general",
+        provider=provider,
+        settings=settings,
+    )
+    assert [p.point for p in result.notable_points] == ["The light was green."]
 
 
 @pytest.mark.parametrize(

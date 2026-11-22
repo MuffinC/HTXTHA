@@ -278,3 +278,8 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   default to `warn` (`EMBEDDED_FILE_POLICY`) and are never extracted or opened; JavaScript and
   launch actions still default to `reject`. A deployment that must refuse attachments can set
   `EMBEDDED_FILE_POLICY=reject`.
+- L-026: The prompt-echo filter (D-080) is a phrase list. It drops any output item that says a
+  document "contains untrusted data" or "does not contain instructions to the AI", even in the
+  rare case where a real document says so. A differently worded echo ("the text is to be
+  treated as data only") is not caught. Other claims that repeat a fact quote are dropped only
+  on containment (D-080); a paraphrase of a quoted sentence still appears in both places.

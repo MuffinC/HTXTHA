@@ -1593,6 +1593,49 @@ All tunable values are named constants at the top of `incident_rules.py`.
   `TopBar.test.tsx` (full name kept in the tooltip of the truncating element).
 - **Milestone:** post-M9 follow-up
 
+## D-080 Three clean-ups from the T4 document view: prompt echoes, empty damage, repeated claims
+
+All three were seen in the author's real-model run (five tickets, incident profile).
+
+- **Prompt echoes are dropped.** A T4 notable point read "The document contains untrusted data
+  and does not contain instructions to the AI system": the model repeating the system prompt.
+  `app.llm.artefacts` (the marker filter, applied to every model output in `parse_output`) now
+  also recognises statements about the system's own instructions: "untrusted data/content/
+  text/input", the **negated** "no / does not contain instructions to (the) AI", and prose
+  naming the markers ("UNTRUSTED_CONTENT markers", "boundary marker", "content markers",
+  "markers with id="). A list item (a string, or an object such as a notable point or entity)
+  with any such string is dropped whole; in a single text field (a summary) only that sentence
+  is removed. Checked before the markers are stripped.
+  - Kept on purpose: "contains instructions to the AI…" (a fair description of an injection
+    attempt; the system prompt asks the model to report such text), and a literal marker copied
+    in front of real content, which the marker filter still strips while keeping the content.
+  - Tests: the exact live sentence (unit and end to end through `analyse_document`), negatives,
+    and sentence-level removal from a summary. Limitation: L-026.
+- **Scene lists must be answered.** T4's scene grid showed "Damage: none" beside observations of
+  a crushed front end: the model returned `damage_locations: []`, and the UI rendered an empty
+  list as "none".
+  - The model now fills `SceneObservationOutput`, where `vehicle_types` and `damage_locations`
+    need at least one entry (`minItems: 1`, enforced by Ollama while decoding like `maxItems`,
+    D-060). `vehicle_types` gains `none_visible` and `unclear`, so every honest answer fits;
+    `damage_locations` already had them. The prompt asks for every damaged location, `none_visible`
+    only for clearly undamaged vehicles, and to list where damage is if the observations mention
+    it (`scene` comes after `observations` in the schema, so the model has written them first).
+  - The stored/API `SceneObservation` still accepts empty lists, so jobs saved earlier still
+    load. The UI shows an empty list as "not reported" (muted, like "unclear"), never as "none";
+    "none visible" is its own value. Tests: `SceneGrid.test.tsx`.
+- **Other claims no longer repeat fact quotes.** T4's "Other claims" listed "It was raining
+  heavily and it was very dark…" and "Nobody else was involved and I was not injured", already
+  shown as quotes in the facts table. `incident_rules.drop_repeated_claims` drops an other
+  claim that contains, or is contained in, the quote of a stated fact, normalised for case,
+  whitespace, quote marks and end punctuation. It runs after grounding (D-058), so only quotes
+  still backing a stated fact count. The shorter text must have at least 3 words, so a one-word
+  quote ("dark") cannot remove a longer claim that merely uses the word. Tests: both T4
+  sentences, a kept new claim, the short-quote guard, and an ungrounded fact's quote.
+- **Live check: not run.** Native Ollama was not running when this was finished, and the
+  standing instruction is not to start it from here (neither its CLI nor Docker's Ollama). The
+  five-ticket confirmation that T4's damage now reads "front" is still to do.
+- **Milestone:** post-M9 follow-up
+
 ---
 
 ## Pending decisions (to record when made)

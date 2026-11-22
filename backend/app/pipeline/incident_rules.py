@@ -1019,6 +1019,53 @@ def ground_facts(facts: IncidentFacts) -> tuple[IncidentFacts, list[str]]:
 
 # --------------------------------------------------------------------------- claims and gaps
 
+_QUOTE_EDGES = " \t\n\"'“”‘’.,;:!?"
+# The shorter text must have at least this many words for containment to count, so
+# a one-word quote ("dark") does not remove a longer claim that merely uses the word.
+MIN_REPEAT_WORDS = 3
+
+
+def _norm_text(text: str) -> str:
+    """Lower-case, collapse whitespace, trim quote marks and end punctuation."""
+    return " ".join(text.split()).lower().strip(_QUOTE_EDGES)
+
+
+def drop_repeated_claims(
+    extraction: IncidentExtractionOutput,
+) -> tuple[IncidentExtractionOutput, int]:
+    """Drop other claims that repeat a quote already used for a stated fact (D-080).
+
+    The model often lists the sentence it quoted for a fact (for example the
+    weather) again as a free-text claim, so the analyst read it twice: once in the
+    facts table, once under "Other claims". A claim is dropped when, normalised for
+    case and whitespace, it contains or is contained in a fact's quote. Only facts
+    still stated after grounding count, so a claim is never lost to a rejected quote.
+
+    Returns:
+        The extraction without those claims, and how many were dropped.
+    """
+    quotes = [
+        _norm_text(fact.as_written)
+        for name in COMPARED_FIELDS
+        if (fact := getattr(extraction.facts, name)).value != "not_mentioned" and fact.as_written
+    ]
+    quotes = [q for q in quotes if q]
+
+    def repeats(claim: str) -> bool:
+        c = _norm_text(claim)
+        for q in quotes:
+            shorter = c if len(c) <= len(q) else q
+            if len(shorter.split()) >= MIN_REPEAT_WORDS and (c in q or q in c):
+                return True
+        return False
+
+    kept = [c for c in extraction.other_claims if not repeats(c.claim)]
+    dropped = len(extraction.other_claims) - len(kept)
+    if not dropped:
+        return extraction, 0
+    return extraction.model_copy(update={"other_claims": kept}), dropped
+
+
 _CORROBORATION = {
     "consistent": "supported",
     "inconsistent": "contradicted",

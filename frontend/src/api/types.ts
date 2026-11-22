@@ -104,13 +104,17 @@ export type DamageLocation = 'front' | 'rear' | 'left_side' | 'right_side' | 'wi
 export type VehicleCount = '1' | '2' | '3' | '4_or_more';
 export type SignalState = 'red' | 'amber' | 'green';
 
-/** Required scene fields on incident photos (the model must answer each one). */
+/**
+ * Required scene fields on incident photos (the model must answer each one).
+ * New results always have at least one list entry (D-080); results saved earlier
+ * may have empty lists, shown as "not reported".
+ */
 export interface SceneObservation {
   lighting: Lighting | 'unclear';
   weather: Weather | 'unclear';
   road_surface: RoadSurface | 'unclear';
   vehicles_visible: 'none' | VehicleCount | 'unclear';
-  vehicle_types: VehicleType[];
+  vehicle_types: (VehicleType | 'none_visible' | 'unclear')[];
   damage_locations: (DamageLocation | 'none_visible' | 'unclear')[];
   traffic_signal: SignalState | 'not_visible' | 'unclear';
   timestamp_visible: string | null;
