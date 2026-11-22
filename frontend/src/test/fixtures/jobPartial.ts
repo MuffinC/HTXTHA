@@ -85,7 +85,8 @@ const fixture: JobResponse = {
           }
         ],
         "warnings": [],
-        "incident": null
+        "incident": null,
+        "triage": null
       }
     },
     {

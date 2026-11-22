@@ -22,6 +22,7 @@ python scripts/generate_sample_tickets.py
 | `t2_taxi_driver.pdf` | Taxi driver | "last night", "around 21:30" (submitted 15 Mar 08:05) | AMK Avenue 3 / Avenue 8 junction | light **red**, **three** vehicles, **rain**, wet road, motorcyclist **holding his arm**, silver car **drove off** | none |
 | `t3_passenger.pdf` | Taxi passenger | 14 March 2025, "at about 9.20pm" | Ang Mo Kio Ave 8, junction with Ave 3 | light **not mentioned**, **two** vehicles, **drizzle**, driver **hurt his wrist** | none |
 | `t4_unrelated_tree.pdf` | Driver (unrelated) | 17 March 2025, "around 11pm" | Upper Thomson Road near Lower Peirce Reservoir | one car into a tree, "**raining heavily**", "**very dark**", not injured | `car_crash_1.jpg` (daylight, dry road) |
+| `t5_weapon_variant.pdf` | Witness (triage demo, M7) | 19 March 2025, "about 10.30pm" | Hougang Avenue 1, near the bus interchange | public disturbance, a man **holding a knife**, **nobody hurt**, the man with the knife **walked off** | none |
 
 Expected results (`ticket_factory.PLANTED`):
 
@@ -31,6 +32,12 @@ Expected results (`ticket_factory.PLANTED`):
   vehicles, weather, injuries, and a party leaving the scene. There is **no** traffic-light
   position for T3, because absence is not a contradiction.
 - **T4, narrative against its own photo:** inconsistent on weather and on lighting.
+- **Triage (incident profile):** T1 P3, T2 P2 (injury and a party drove off), T3 P2 (injury),
+  T4 P3. The T1–T3 group is P2: its highest report is P2, and its contradictions on safety
+  fields (traffic light, injuries, a party leaving, vehicle count) need follow-up; the time
+  and weather differences are listed but do not lift it. T5 is kept out of the four-ticket set:
+  its fixed fields give at most P2, and the knife appears only in the narrative, so it reaches
+  P1 only through a model raise whose quote is checked against the page text.
 
 ### `tickets/assets/` — images used in the tickets
 

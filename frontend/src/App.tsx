@@ -23,7 +23,7 @@ export default function App() {
   const config = useFetchOnce(api.config);
   const profiles = useFetchOnce(api.profiles);
   const { url, setJob, setTab } = useUrlState();
-  const { job, problem } = useJob(url.job);
+  const { job, problem, refresh } = useJob(url.job);
   const docs = useMemo(() => (job ? labelDocuments(job) : { byId: new Map() }), [job]);
 
   const unreachable = health.reachable === false || problem === 'unreachable';
@@ -70,7 +70,7 @@ export default function App() {
               another machine, or the database was reset.
             </Notice>
           ) : job ? (
-            <ResultsArea job={job} docs={docs} tab={url.tab} onTab={setTab} />
+            <ResultsArea job={job} docs={docs} tab={url.tab} onTab={setTab} onRefresh={refresh} />
           ) : url.job && unreachable ? (
             <Notice tone="neutral" icon="plug" title="Waiting for the backend">
               This job’s results will load as soon as the backend can be reached again.

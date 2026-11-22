@@ -96,6 +96,10 @@ class TimelineEvent(BaseModel):
 class DocumentGroup(BaseModel):
     document_ids: list[str]
     reason: str
+    # Incident profile (addition, D-062): highest priority of the group's reports,
+    # lifted to P2 by a safety-relevant contradiction.
+    priority: str | None = None
+    priority_reason: str | None = None
 
 
 class IncidentNarrativeOutput(BaseModel):

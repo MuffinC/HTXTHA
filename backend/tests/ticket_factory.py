@@ -146,6 +146,28 @@ T4 = Ticket(
 
 TICKETS: list[Ticket] = [T1, T2, T3, T4]
 
+#: Triage demo (M7), kept out of TICKETS so the M6 scorecard set is unchanged. The
+#: fixed fields give at most P2 (a party walked off); the knife is only in the text,
+#: so only a grounded model raise can take it to P1.
+WEAPON_TICKET = Ticket(
+    key="t5_weapon_variant",
+    reference="CW-24-1005",
+    submitted="19 March 2025, 22:40",
+    category="Public disturbance",
+    occurred_date="19 March 2025",
+    occurred_time="about 10.30pm",
+    location="Hougang Avenue 1, near the bus interchange",
+    reporter="Witness",
+    contact="9123 4567",
+    narrative=[
+        "Two men were shouting at each other outside the coffee shop.",
+        "One of them was holding a knife and waving it at the other man.",
+        "Nobody was hurt as far as I could see. The man with the knife walked off towards the "
+        "bus interchange.",
+    ],
+    expected={"injuries": "none"},
+)
+
 #: What the rules should find with a perfect extraction (used by tests and the scorecard).
 PLANTED = {
     "same_incident": {"t1_witness", "t2_taxi_driver", "t3_passenger"},

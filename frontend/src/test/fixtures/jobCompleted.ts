@@ -85,7 +85,8 @@ const fixture: JobResponse = {
           }
         ],
         "warnings": [],
-        "incident": null
+        "incident": null,
+        "triage": null
       }
     },
     {
@@ -129,7 +130,8 @@ const fixture: JobResponse = {
         ],
         "visual_elements": [],
         "warnings": [],
-        "incident": null
+        "incident": null,
+        "triage": null
       }
     },
     {
@@ -188,7 +190,8 @@ const fixture: JobResponse = {
             "page": 2
           }
         ],
-        "incident": null
+        "incident": null,
+        "triage": null
       }
     }
   ],
@@ -280,7 +283,9 @@ const fixture: JobResponse = {
           "00000000-0000-4000-8000-000000000003",
           "00000000-0000-4000-8000-000000000004"
         ],
-        "reason": "[MOCK] Same incident."
+        "reason": "[MOCK] Same incident.",
+        "priority": null,
+        "priority_reason": null
       }
     ],
     "information_gaps": [

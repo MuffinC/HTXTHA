@@ -22,6 +22,10 @@ export interface MockApiOptions {
   jobs?: Record<string, JobResponse | JobResponse[]>;
   /** Response for POST /api/jobs: a body (202) or [status, body]. */
   createJob?: JobCreatedResponse | [number, unknown];
+  /** Reply to PUT .../triage as [status, body]. Default: 200 echoing the decision. */
+  triage?: [number, unknown];
+  /** Reply to POST .../feedback as [status, body]. Default: 201 {id: 1}. */
+  feedback?: [number, unknown];
 }
 
 const json = (body: unknown, status = 200) =>
@@ -40,6 +44,15 @@ export function mockApi(options: MockApiOptions = {}) {
     if (url === '/api/jobs' && method === 'POST') {
       const reply = options.createJob ?? jobCreated;
       return Array.isArray(reply) ? json(reply[1], reply[0]) : json(reply, 202);
+    }
+    if (/^\/api\/jobs\/[^/]+\/documents\/[^/]+\/triage$/.test(url) && method === 'PUT') {
+      if (options.triage) return json(options.triage[1], options.triage[0]);
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return json({ priority: 'P2', reason: 'Confirmed', ...body, at: '2026-01-01T09:05:00Z' });
+    }
+    if (/^\/api\/jobs\/[^/]+\/feedback$/.test(url) && method === 'POST') {
+      const [status, body] = options.feedback ?? [201, { id: 1 }];
+      return json(body, status);
     }
     const match = url.match(/^\/api\/jobs\/(.+)$/);
     if (match) {

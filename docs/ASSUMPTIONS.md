@@ -93,6 +93,14 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - A-124: Relative dates are resolved only for a fixed list of phrases (last night, yesterday,
   tonight, today, this morning, afternoon or evening). Others, such as "the other day" or "on
   Saturday", leave the date unknown, which is reported as missing information.
+- A-125: The triage rule floor treats "no injuries stated" as P3 only when the report says so
+  explicitly (`injuries = none`). A report that does not mention injuries at all falls to P4
+  ("no rubric condition met") rather than being assumed safe. (DECISIONS D-062)
+- A-126: An override reason of at least 5 characters is enough to show intent; the content is
+  not checked. Reviews are attributed to "the analyst" because there is no authentication
+  (A-001).
+- A-127: The agreement rate uses each document's latest review only. An analyst who confirms
+  and later overrides counts once, as an override.
 
 ## Frontend
 
@@ -210,3 +218,23 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   masking placeholders (`[PHONE REDACTED]`, `[NRIC/FIN REDACTED]`, plus punctuation) are dropped
   deterministically, like the pipeline-marker filter (`pii.is_only_mask`). Entities that merely
   contain a placeholder, such as "Driver on [PHONE REDACTED]", are kept.
+- L-016: **Triage asymmetry (deliberate, safety-first).** Text injected into a report cannot
+  lower a priority below the rule floor, because the floor is computed by code from grounded
+  facts and the model may only raise. It **could** induce an escalation: a page that contains
+  "a man with a knife" as an injected sentence will have that quote found on the page, and the
+  raise is accepted. This trade-off is intended: a false escalation costs analyst time, while a
+  false de-escalation could cost a response. Such pages are also flagged
+  `INJECTION_SUSPECTED` when the scanner recognises the phrasing, every triage result requires
+  human review, and the model's factors are labelled "AI, quote checked" so the analyst can
+  open the cited page.
+- L-017: Grounding checks that the quote is on the page, not that it supports the claim. A
+  verbatim "no weapon was involved" would ground a weapon raise. The analyst sees the quote
+  and the page chip; a stricter check (negation detection) was left out as unreliable.
+- L-019: In the one live run, the 4B model did **not** raise the knife ticket (T5) to P1: it
+  stayed at the rule floor, P2. The rubric's weapon condition therefore depends on the model,
+  and the model missed it. The safe failure mode holds (the priority was not lowered, and the
+  analyst still reviews it), but a weapon can be under-prioritised. A likely fix is to make
+  "weapon mentioned" an extracted, quote-grounded fact so code applies P1 directly, as for
+  injuries. That was not done in M7.
+- L-018: The mock provider's triage raise is a weapon keyword match. It demonstrates the
+  grounding path on the sample tickets but says nothing about real model quality.

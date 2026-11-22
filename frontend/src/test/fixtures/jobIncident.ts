@@ -168,6 +168,30 @@ const fixture: JobResponse = {
               "source": "Singapore daylight at 21:15"
             }
           }
+        },
+        "triage": {
+          "suggested_priority": "P3",
+          "rationale": "Rule floor P3: No injuries reported.",
+          "triggering_factors": [
+            {
+              "factor": "No injuries reported",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000002",
+                "page": 1
+              },
+              "source": "rule"
+            }
+          ],
+          "confidence": "high",
+          "requires_human_review": true,
+          "analyst_override": {
+            "action": "override",
+            "priority": "P2",
+            "reason": "Same incident as the P2 reports",
+            "at": "2026-01-01T09:00:00Z"
+          },
+          "rule_priority": "P3",
+          "model_priority": null
         }
       }
     },
@@ -331,6 +355,33 @@ const fixture: JobResponse = {
               "source": "Singapore daylight at 21:30"
             }
           }
+        },
+        "triage": {
+          "suggested_priority": "P2",
+          "rationale": "Rule floor P2: Injury reported; A party left the scene.",
+          "triggering_factors": [
+            {
+              "factor": "Injury reported",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000003",
+                "page": 1
+              },
+              "source": "rule"
+            },
+            {
+              "factor": "A party left the scene",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000003",
+                "page": 1
+              },
+              "source": "rule"
+            }
+          ],
+          "confidence": "high",
+          "requires_human_review": true,
+          "analyst_override": null,
+          "rule_priority": "P2",
+          "model_priority": null
         }
       }
     },
@@ -475,6 +526,25 @@ const fixture: JobResponse = {
               "source": "Singapore daylight at 21:20"
             }
           }
+        },
+        "triage": {
+          "suggested_priority": "P2",
+          "rationale": "Rule floor P2: Injury reported.",
+          "triggering_factors": [
+            {
+              "factor": "Injury reported",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000004",
+                "page": 1
+              },
+              "source": "rule"
+            }
+          ],
+          "confidence": "high",
+          "requires_human_review": true,
+          "analyst_override": null,
+          "rule_priority": "P2",
+          "model_priority": null
         }
       }
     },
@@ -680,12 +750,189 @@ const fixture: JobResponse = {
               "source": "Singapore daylight at 23:00"
             }
           }
+        },
+        "triage": {
+          "suggested_priority": "P3",
+          "rationale": "Rule floor P3: No injuries reported.",
+          "triggering_factors": [
+            {
+              "factor": "No injuries reported",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000005",
+                "page": 1
+              },
+              "source": "rule"
+            }
+          ],
+          "confidence": "high",
+          "requires_human_review": true,
+          "analyst_override": null,
+          "rule_priority": "P3",
+          "model_priority": null
+        }
+      }
+    },
+    {
+      "document_id": "00000000-0000-4000-8000-000000000006",
+      "filename": "t5_weapon_variant.pdf",
+      "status": "completed",
+      "page_count": 2,
+      "error": null,
+      "analysis": {
+        "document_id": "00000000-0000-4000-8000-000000000006",
+        "filename": "t5_weapon_variant.pdf",
+        "page_count": 2,
+        "profile": "incident",
+        "document_type_guess": "[MOCK] document",
+        "summary": "[MOCK] Public incident report Reference No: CW-24-1005 Reference No: CW-24-1005 Submitted on: 19 March 2025, 22:40 Category: Public disturbance Date of incident: 19 March 2025 Approx. Attachments Reference No: CW-24-1005 No photos were attached to this report.",
+        "main_topics": [
+          "[MOCK] topic A",
+          "[MOCK] topic B"
+        ],
+        "key_entities": [
+          {
+            "name": "[MOCK] Sample location",
+            "type": "location",
+            "pages": [
+              1
+            ]
+          },
+          {
+            "name": "[MOCK] Sample organisation",
+            "type": "organisation",
+            "pages": [
+              2
+            ]
+          }
+        ],
+        "notable_points": [
+          {
+            "point": "[MOCK] Public incident report Reference No: CW-24-1005 Reference No: CW-24-1005 Submitted on: 19 March 2025, 22:40 Category: Public disturbance Date of incident: 19 March 2025 Approx.",
+            "page": 1
+          },
+          {
+            "point": "[MOCK] Attachments Reference No: CW-24-1005 No photos were attached to this report.",
+            "page": 2
+          }
+        ],
+        "visual_elements": [],
+        "warnings": [],
+        "incident": {
+          "ticket": {
+            "reference_no": "CW-24-1005",
+            "submitted_at": "19 March 2025, 22:40",
+            "category": "other",
+            "category_confidence": "medium"
+          },
+          "occurred_at_stated": "19 March 2025 about 10.30pm",
+          "location_stated": "Hougang Avenue 1, near the bus interchange",
+          "narrative_summary": "[MOCK] Two men were shouting at each other outside the coffee shop.",
+          "parties": [
+            {
+              "role": "[MOCK] reporter",
+              "description": "[MOCK] the person who submitted the report"
+            }
+          ],
+          "claims": [
+            {
+              "claim": "Injuries: none (“Nobody was hurt as far as I could see.”)",
+              "page": 1,
+              "corroboration": "not_verifiable",
+              "note": "No photo attached."
+            }
+          ],
+          "consistency_checks": [],
+          "missing_information": [
+            "No photo attached, so the account cannot be checked against images."
+          ],
+          "facts": {
+            "traffic_light": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "vehicle_count": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "weather": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "road_surface": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "lighting": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "injuries": {
+              "value": "none",
+              "as_written": "Nobody was hurt as far as I could see.",
+              "page": 1
+            },
+            "party_left_scene": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "vehicle_types": [
+              "bus"
+            ],
+            "damage_locations": []
+          },
+          "derived": {
+            "incident_date": {
+              "value": "2025-03-19",
+              "source": "as stated"
+            },
+            "incident_time": {
+              "value": "22:30",
+              "source": "from 'about 10.30pm'"
+            },
+            "expected_lighting": {
+              "value": "night",
+              "source": "Singapore daylight at 22:30"
+            }
+          }
+        },
+        "triage": {
+          "suggested_priority": "P1",
+          "rationale": "Rule floor P3: No injuries reported. Raised to P1 by the model, with quoted evidence.",
+          "triggering_factors": [
+            {
+              "factor": "No injuries reported",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000006",
+                "page": 1
+              },
+              "source": "rule"
+            },
+            {
+              "factor": "[MOCK] A weapon is mentioned (“One of them was holding a knife and waving it at the other man.”)",
+              "citation": {
+                "document_id": "00000000-0000-4000-8000-000000000006",
+                "page": 1
+              },
+              "source": "model"
+            }
+          ],
+          "confidence": "medium",
+          "requires_human_review": true,
+          "analyst_override": null,
+          "rule_priority": "P3",
+          "model_priority": "P1"
         }
       }
     }
   ],
   "consolidated": {
-    "overall_summary": "[MOCK] Consolidated summary of 4 documents.",
+    "overall_summary": "[MOCK] Consolidated summary of 5 documents.",
     "common_themes": [
       {
         "theme": "[MOCK] Shared theme",
@@ -704,6 +951,10 @@ const fixture: JobResponse = {
           },
           {
             "document_id": "00000000-0000-4000-8000-000000000005",
+            "page": 1
+          },
+          {
+            "document_id": "00000000-0000-4000-8000-000000000006",
             "page": 1
           }
         ]
@@ -894,6 +1145,16 @@ const fixture: JobResponse = {
             "page": 1
           }
         ]
+      },
+      {
+        "time": "19 Mar 2025 22:30",
+        "event": "Incident as reported by D5 (“19 March 2025 about 10.30pm”)",
+        "citations": [
+          {
+            "document_id": "00000000-0000-4000-8000-000000000006",
+            "page": 1
+          }
+        ]
       }
     ],
     "related_document_groups": [
@@ -903,7 +1164,9 @@ const fixture: JobResponse = {
           "00000000-0000-4000-8000-000000000003",
           "00000000-0000-4000-8000-000000000004"
         ],
-        "reason": "Same incident by rule (D1, D2, D3): same date (14 Mar 2025); times 21:15 and 21:30 within 60 min; same place words (3, 8, ang, avenue, kio, mo)."
+        "reason": "Same incident by rule (D1, D2, D3): same date (14 Mar 2025); times 21:15 and 21:30 within 60 min; same place words (3, 8, ang, avenue, kio, mo).",
+        "priority": "P2",
+        "priority_reason": "Group P2: highest report priority P2; contradictions needing follow-up on Traffic light, Number of vehicles, Injuries, A party left the scene (at least P2); also differ on Time of the incident, Weather (does not lift)."
       }
     ],
     "information_gaps": [
@@ -912,7 +1175,7 @@ const fixture: JobResponse = {
     "warnings": [],
     "possibly_related_groups": [],
     "rule_based": true,
-    "rule_summary": "3 reports describe 1 incident; 1 report describes a separate incident."
+    "rule_summary": "3 reports describe 1 incident; 2 reports describe separate incidents."
   },
   "consolidated_error": null
 };

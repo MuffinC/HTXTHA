@@ -127,7 +127,7 @@ the rest come from the model and are validated, citation-checked and PII-masked.
 | `visual_elements` (P) | `VisualElement[]` | From stage 2 |
 | `warnings` (P) | `Warning[]` | Upload, extraction, visual and analysis warnings |
 
-`incident`, `statistical` and `triage` arrive in M6, M8 and M7.
+`incident` (M6) and `triage` (M7) are documented below; `statistical` arrives in M8.
 
 ### `ConsolidatedReport` — `app/schemas/consolidated.py`
 
@@ -138,7 +138,7 @@ the rest come from the model and are validated, citation-checked and PII-masked.
 | `agreements` | `{point, citations: Citation[]}[]` |
 | `contradictions` | `{topic, positions: {position, citation: Citation}[]}[]` (at least 2 positions) |
 | `timeline` | `{time, event, citations: Citation[]}[]` |
-| `related_document_groups` | `{document_ids: string[], reason}[]` (at least 2 documents) |
+| `related_document_groups` | `DocumentGroup[]`: `{document_ids: string[], reason, priority?, priority_reason?}` (at least 2 documents; priority fields in the incident profile) |
 | `information_gaps` | `string[]` |
 | `warnings` | `Warning[]`. **Addition to the spec** (DECISIONS D-034) |
 
@@ -207,9 +207,44 @@ For the incident profile the model only writes `overall_summary`, `common_themes
 Warning code `INCIDENT_EXTRACTION_FAILED`: the core analysis is kept, but the incident sections
 are missing.
 
+### Triage (incident profile) — `app/schemas/triage.py` (DECISIONS D-062 to D-066)
+
+`DocumentAnalysis.triage: Triage | null` (incident profile only):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `suggested_priority` | `P1 \| P2 \| P3 \| P4` | The more severe of `rule_priority` and an accepted model raise |
+| `rationale` | `string` | Written by code: the floor, and the raise or why it was ignored |
+| `triggering_factors` | `{factor, citation: Citation, source: rule \| model}[]` | Every factor cites its page. **`source` is an addition** |
+| `confidence` | `low \| medium \| high` | |
+| `requires_human_review` | `true` | Always |
+| `analyst_override` | `AnalystOverride \| null` | The latest analyst decision (attached by the API) |
+| `rule_priority` (**addition**) | `Priority` | Floor computed by code from the grounded facts |
+| `model_priority` (**addition**) | `Priority \| null` | Set only when a grounded raise was accepted |
+
+`AnalystOverride`: `{action: confirm | override, priority, reason, at}` (`action` is an
+addition to the spec).
+
+Model output (`TriageModelOutput`, sent as Ollama `format`): `{proposed_priority, reason
+(≤300), evidence: {quote (≤200), page}[] (≤4), confidence}`.
+
+`DocumentGroup` (**additions**, incident profile): `priority: Priority | null` and
+`priority_reason: string | null` (D-064).
+
+**Endpoints**
+
+- `PUT /api/jobs/{job_id}/documents/{document_id}/triage`, body
+  `{action: "confirm" | "override", priority?, reason? (≤500)}` → `AnalystOverride`.
+  422 `VALIDATION_ERROR` for an override without a priority or a reason of 5+ characters;
+  404 `NOT_FOUND` for an unknown job or document, or a document without triage.
+- `POST /api/jobs/{job_id}/feedback`, body `{target: document | consolidated | section,
+  target_id (1–120 chars), rating: up | down, comment? (≤1000)}` → **201** `{id}`.
+- `GET /api/feedback/stats` → `{ratings: {key: {up, down}}, total_up, total_down,
+  triage_reviewed, triage_kept, triage_agreement_rate: float | null}`. Keys are
+  `section:<target_id>` for sections, otherwise the target name.
+
 ## Planned (to be documented as implemented)
 
 | Schema | Milestone |
 |---|---|
-| `Triage` | M7 |
 | `StatisticalExtension` | M8 |

@@ -1,7 +1,7 @@
 // Polls GET /api/jobs/{id} every 2 s until the job reaches a final status
 // (CLAUDE.md section 10). Network failures keep the last result on screen and
 // retry with backoff, so a backend blip never blanks the page.
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from '../api/client';
 import { FINAL_JOB_STATUSES, type JobResponse } from '../api/types';
 
@@ -14,7 +14,12 @@ export interface JobState {
   problem: 'not_found' | 'unreachable' | null;
 }
 
-export function useJob(jobId: string | null): JobState {
+export interface UseJob extends JobState {
+  /** Fetch the job once now (after an analyst action), without restarting polling. */
+  refresh: () => Promise<void>;
+}
+
+export function useJob(jobId: string | null): UseJob {
   const [state, setState] = useState<JobState>({ job: null, problem: null });
 
   useEffect(() => {
@@ -49,5 +54,11 @@ export function useJob(jobId: string | null): JobState {
     };
   }, [jobId]);
 
-  return state;
+  const refresh = useCallback(async () => {
+    if (!jobId) return;
+    const job = await api.job(jobId);
+    setState({ job, problem: null });
+  }, [jobId]);
+
+  return { ...state, refresh };
 }

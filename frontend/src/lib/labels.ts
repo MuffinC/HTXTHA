@@ -6,11 +6,40 @@ import type {
   FactField,
   IncidentClaim,
   PiiCategory,
+  Priority,
   VisualType,
   WarningCode,
 } from '../api/types';
 
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+
+export const PRIORITIES: readonly Priority[] = ['P1', 'P2', 'P3', 'P4'];
+
+/** Short label and the rubric line (CLAUDE.md section 8) for each priority. */
+export const PRIORITY_INFO: Record<Priority, { label: string; tone: Tone; meaning: string }> = {
+  P1: {
+    label: 'Urgent',
+    tone: 'danger',
+    meaning:
+      'Ongoing danger to life, serious injury or death, weapons, or a suspect at large posing a risk.',
+  },
+  P2: {
+    label: 'High',
+    tone: 'warning',
+    meaning:
+      'Injury reported, a party left the scene, significant property damage, or major contradictions needing follow-up.',
+  },
+  P3: {
+    label: 'Routine',
+    tone: 'info',
+    meaning: 'Property damage only, no injuries, parties identified.',
+  },
+  P4: {
+    label: 'Low',
+    tone: 'neutral',
+    meaning: 'Informational, duplicate of another report, or insufficient detail to act on.',
+  },
+};
 
 export const DOCUMENT_STATUS_LABEL: Record<DocumentStatus, string> = {
   queued: 'Queued',

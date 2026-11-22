@@ -6,6 +6,7 @@ import { CitationChip, Citations } from './Citations';
 import { Section, WarningBanner } from './Common';
 import { FactsTable, IncidentDetails, TicketCard } from './IncidentSections';
 import { ModelText } from './ModelText';
+import { TriagePanel } from './TriagePanel';
 import { VisualElementCard } from './VisualElementCard';
 
 export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; label: string }) {
@@ -27,8 +28,7 @@ export function DocumentView({ analysis, label }: { analysis: DocumentAnalysis; 
             <ModelText text={analysis.document_type_guess} />
           </p>
         </div>
-        {/* Slot for the triage badge and analyst override (M7). */}
-        <div className="slot-triage" data-slot="triage" />
+        {analysis.triage && <TriagePanel triage={analysis.triage} documentId={id} />}
       </header>
 
       <WarningBanner warnings={analysis.warnings} documentId={id} />

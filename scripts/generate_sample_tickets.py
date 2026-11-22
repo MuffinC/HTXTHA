@@ -1,9 +1,10 @@
 """Generate the synthetic incident tickets in ``sample_pdfs/tickets/``.
 
 The tickets come from ``backend/tests/ticket_factory.py`` (the same builders the
-tests and the live scorecard use). Four e-report forms from a fictional portal:
+tests and the live scorecard use). Five e-report forms from a fictional portal:
 three reports of one incident with planted contradictions, and one unrelated
-incident whose narrative contradicts its own photo. See ``sample_pdfs/README.md``.
+incident whose narrative contradicts its own photo, plus a weapon variant (T5)
+used to demonstrate a grounded model raise in triage. See ``sample_pdfs/README.md``.
 
 Usage (from the repo root, with the backend environment active):
 
@@ -27,7 +28,7 @@ from app.logging_config import configure_logging  # noqa: E402
 from app.pipeline.extraction import extract_document  # noqa: E402
 from app.pipeline.validation import validate_file  # noqa: E402
 from app.schemas.validation import AcceptedFile  # noqa: E402
-from tests.ticket_factory import TICKETS, ticket_pdf  # noqa: E402
+from tests.ticket_factory import TICKETS, WEAPON_TICKET, ticket_pdf  # noqa: E402
 
 
 def main() -> int:
@@ -36,7 +37,7 @@ def main() -> int:
     configure_logging("ERROR")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     failures = 0
-    for ticket in TICKETS:
+    for ticket in [*TICKETS, WEAPON_TICKET]:
         name = f"{ticket.key}.pdf"
         data = ticket_pdf(ticket)
         (OUTPUT_DIR / name).write_bytes(data)
@@ -51,7 +52,7 @@ def main() -> int:
             f"visual_pages={extracted.visual_pages} "
             f"removed_footer={bool(extracted.boilerplate_lines)}"
         )
-    print(f"\nWrote {len(TICKETS)} tickets to {OUTPUT_DIR.relative_to(REPO_ROOT)}")
+    print(f"\nWrote {len(TICKETS) + 1} tickets to {OUTPUT_DIR.relative_to(REPO_ROOT)}")
     return 1 if failures else 0
 
 

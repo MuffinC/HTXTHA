@@ -49,6 +49,7 @@ class MockProvider(LLMProvider):
             LLMTask.CHUNK_NOTES: _chunk_notes_output,
             LLMTask.CONSOLIDATION: _consolidation_output,
             LLMTask.INCIDENT_EXTRACTION: _incident_output,
+            LLMTask.TRIAGE: _triage_output,
         }
         payload = builders[request.task](request.metadata)
         return LLMResult(
@@ -329,4 +330,30 @@ def _incident_output(metadata: dict[str, Any]) -> dict[str, Any]:
         "facts": facts,
         "other_claims": [],
         "missing_information": [],
+    }
+
+
+# ---------------------------------------------------------------- triage
+# The mock raises only when a page mentions a weapon (the demo keyword), quoting
+# the sentence verbatim so the real grounding check accepts it. Otherwise it
+# proposes the rule floor, so the rule-based priorities show unchanged.
+_WEAPON = re.compile(r"\b(knife|knives|weapon|gun|parang|machete)\b", re.IGNORECASE)
+
+
+def _triage_output(metadata: dict[str, Any]) -> dict[str, Any]:
+    floor = metadata.get("rule_floor", "P4")
+    for page, text in metadata.get("page_texts", {}).items():
+        for line in text.splitlines():
+            if _WEAPON.search(line):
+                return {
+                    "proposed_priority": "P1",
+                    "reason": "[MOCK] A weapon is mentioned",
+                    "evidence": [{"quote": line.strip()[:150], "page": int(page)}],
+                    "confidence": "medium",
+                }
+    return {
+        "proposed_priority": floor,
+        "reason": "[MOCK] Nothing beyond the rule floor",
+        "evidence": [],
+        "confidence": "medium",
     }

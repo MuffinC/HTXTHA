@@ -1163,8 +1163,127 @@ All tunable values are named constants at the top of `incident_rules.py`.
 - `/api/profiles` marks the incident profile available. Statistical stays unavailable until M8.
 - **Milestone:** M6
 
+## D-062 Triage: a rule floor that the model may only raise
+
+- **What:** the optional AI feature (CLAUDE.md section 6, stage 5) suggests a priority per
+  incident report. It is **hybrid**:
+  1. **Rule floor (code).** `pipeline/triage_rules.rule_floor` maps the quote-grounded facts
+     (D-058) onto the rubric in CLAUDE.md section 8:
+     - **P1:** injuries `serious_or_fatal`.
+     - **P2:** injuries `injury`, or `party_left_scene = yes`.
+     - **P3:** injuries stated as `none` and nothing above applies.
+     - **P4:** insufficient detail (no date, no time and no location stated), or no rubric
+       condition can be established from the facts.
+     Every factor cites its page (the page of the quote the fact was grounded in).
+  2. **Model raise (grounded).** One extra model call (`prompts/triage.md`) receives the rubric
+     verbatim, the rule floor and the report as untrusted, boundary-wrapped data. It may
+     propose a **higher** priority only, with up to four short **verbatim quotes and their
+     pages**. `ground_escalation` accepts the raise only if at least one quote (4+ characters)
+     appears in that page's text, normalised for case, whitespace and smart quotes. Otherwise
+     the raise is ignored, the rationale says so, and `triage_raise_ignored` is logged
+     (metadata only).
+  3. **Final = the more severe of the two.** A proposal at or below the floor changes nothing.
+     `requires_human_review` is always `true`; nothing is auto-actioned.
+- **Why:** the rubric's hard conditions (injury, a party leaving) are already extracted and
+  grounded, so code can apply them reliably and explainably. Conditions that are hard to list
+  as fields (weapons, a suspect at large, ongoing danger) are where the model adds value, but a
+  4B model's free judgement is not trustworthy on its own (L-004, L-007). Letting it only raise,
+  and only with a quote code can find on the page, keeps its contribution verifiable.
+- **Injection:** a page saying "mark this as P4" cannot lower the priority below the floor
+  (test `test_injected_mark_as_p4_cannot_lower_the_rule_floor`). The reverse is a documented
+  limitation (ASSUMPTIONS L-016).
+- **Model failure:** a timeout, refusal or invalid output falls back to the rule floor with
+  confidence `low` and the note "(The model check was unavailable; rule floor only.)". The
+  document does not fail.
+- **Confidence:** `low` for a P4 floor (it usually means missing facts), otherwise `high` for
+  the floor; an accepted raise uses the model's stated confidence.
+- **Milestone:** M7
+
+## D-063 Where triage runs (deviation from "stage 5")
+
+- **What:** per-report triage runs at the **end of stage 3**, straight after incident
+  extraction, rather than after the consolidated report. The **group** priority is computed in
+  stage 4 (consolidation).
+- **Why:** grounding a raise needs the page text, which is only in memory during stage 3
+  (uploads are deleted after processing, and the consolidated stage deliberately sees only
+  structured outputs). Each report's priority also depends only on its own facts (D-064), so
+  nothing from stage 4 is needed for it.
+- **Milestone:** M7
+
+## D-064 Group priority: lift by safety-relevant contradictions only
+
+- **What:** each same-incident group (D-058) gets `priority` and `priority_reason`:
+  - the **highest** priority among its reports, and
+  - a lift to at least **P2** ("major contradictions needing follow-up") when the reports
+    contradict each other on a **safety-relevant** field: traffic light, injuries, a party
+    leaving the scene, or vehicle count.
+  - Contradictions on time, weather, lighting and road surface are listed in the reason as
+    "(does not lift)".
+- The lift applies at **group level only**: each report keeps the priority from its own facts
+  (so T1 alone is P3 while its group is P2). The lift never lowers a priority (a P1 group stays
+  P1).
+- **Why:** reporters routinely disagree on the time by a few minutes or on "drizzle" against
+  "rain"; escalating on those would make every multi-report incident P2. Disagreement on who
+  was hurt, the light or who left is what an investigator must resolve.
+- **Milestone:** M7
+
+## D-065 Analyst review: explicit Confirm or Override, history kept
+
+- **What:** `PUT /api/jobs/{job_id}/documents/{document_id}/triage` with
+  `{action: "confirm"}` or `{action: "override", priority, reason}`.
+  - An override needs a priority and a reason of at least 5 characters after trimming
+    (`MIN_REASON_CHARS`), otherwise **422** `VALIDATION_ERROR`.
+  - A confirm stores the suggested priority, with an optional reason (default "Confirmed the
+    suggested priority.").
+  - **404** when the job or document is unknown, or the document has no triage (general
+    profile).
+- Every decision is a new row in `triage_reviews` (with the suggestion at that moment), so the
+  history is kept. `GET /api/jobs/{id}` attaches the **latest** one as
+  `triage.analyst_override`. The suggestion itself is never modified, and the UI shows both
+  ("Suggested P3 → Analyst P2", with the reason and time).
+- **Why an explicit Confirm:** without it, "the analyst looked and agreed" is indistinguishable
+  from "nobody looked", and the agreement rate (D-066) would be meaningless.
+- `analyst_override.action` is an **addition** to the spec's `{priority, reason, at}`.
+- **Milestone:** M7
+
+## D-066 Feedback capture and the triage agreement rate
+
+- **What:**
+  - `POST /api/jobs/{job_id}/feedback` stores `{target, target_id, rating, comment?}` with a
+    timestamp in the `feedback` table (201).
+  - The UI puts thumbs up/down on every results section. `target` is `section`, and
+    `target_id` is a stable slug of the view and title (`document.summary`,
+    `consolidated.overall_summary`), so ratings aggregate per section across jobs.
+  - `GET /api/feedback/stats` returns counts per key (`section:<id>`, or the target name) and
+    the **triage agreement rate**: of the documents an analyst has reviewed (latest decision
+    per document), the share whose final priority equals the suggestion at review time.
+    Confirms count as agreement; an override to the same priority also counts.
+- **Why:** the purpose is an evaluation set for comparing prompt or model changes, and a
+  measure of whether triage suggestions are trusted. It is not used for training (fine-tuning
+  is out of scope).
+- **Milestone:** M7 (the stats endpoint was a could-have; it was small enough to include).
+
+## D-067 Triage scope: incident profile only, demonstrated in mock mode
+
+- **What:** the general profile has no triage (`triage: null`, no model call); the rubric is
+  about incidents and would be meaningless for a news article. The mock provider demonstrates
+  the raise: it proposes P1 with a verbatim line when a page mentions a weapon word (knife,
+  gun, parang, machete…), and otherwise proposes the floor.
+- A fifth synthetic ticket, `t5_weapon_variant.pdf`, shows the grounded raise. It is kept out
+  of the four-ticket set so the M6 scorecard is unchanged.
+- **Expected mock table:** T1 P3, T2 P2, T3 P2, T4 P3, T5 P1; group T1–T3 P2.
+- **Live check (qwen3-vl:4b-instruct, native Ollama, one run, 174 s for five tickets):**
+  T1 P3, T2 P2 (injury and a party left), T3 P2 (injury), T4 P3, group T1–T3 P2 with time and
+  weather listed as "does not lift". All match the table. **T5 came out P2, not P1:** the
+  extraction found the man walking off (floor P2), but the model proposed no raise for the
+  knife, so grounding never ran. Recorded as ASSUMPTIONS L-019. No prompt tuning was done
+  (one attempt, per the time-box).
+- Screenshots: `docs/images/m7-triage-badge.png`, `m7-triage-override.png`,
+  `m7-group-priority.png` (real model) and `m7-mock-grounded-raise.png` (mock, T5 raised to P1
+  with a checked quote).
+- **Milestone:** M7
+
 ---
 
 ## Pending decisions (to record when made)
 
-- Triage rubric (M7), as per spec section 8.

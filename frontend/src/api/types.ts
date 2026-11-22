@@ -189,6 +189,57 @@ export interface VisualElement {
   ai_generated: true;
 }
 
+// ---------------------------------------------------------------- triage (incident profile)
+
+export type Priority = 'P1' | 'P2' | 'P3' | 'P4';
+export type Confidence = 'low' | 'medium' | 'high';
+
+/** One reason for the priority. `source` says whether code or the model found it. */
+export interface TriageFactor {
+  factor: string;
+  citation: Citation;
+  source: 'rule' | 'model';
+}
+
+/** The analyst's decision on a suggestion: kept (confirm) or changed (override). */
+export interface AnalystOverride {
+  action: 'confirm' | 'override';
+  priority: Priority;
+  reason: string;
+  at: string;
+}
+
+/**
+ * Suggested priority: the more severe of the rule floor (code, from the facts)
+ * and a model raise that was grounded in a verbatim quote. Never auto-actioned.
+ */
+export interface Triage {
+  suggested_priority: Priority;
+  rationale: string;
+  triggering_factors: TriageFactor[];
+  confidence: Confidence;
+  requires_human_review: true;
+  analyst_override: AnalystOverride | null;
+  rule_priority: Priority;
+  /** Set only when the model's raise was accepted. */
+  model_priority: Priority | null;
+}
+
+export interface TriageReviewRequest {
+  action: 'confirm' | 'override';
+  priority?: Priority;
+  reason?: string;
+}
+
+export type FeedbackTarget = 'document' | 'consolidated' | 'section';
+
+export interface FeedbackRequest {
+  target: FeedbackTarget;
+  target_id: string;
+  rating: 'up' | 'down';
+  comment?: string;
+}
+
 // ---------------------------------------------------------------- document analysis
 
 export type EntityType =
@@ -224,9 +275,19 @@ export interface DocumentAnalysis {
   visual_elements: VisualElement[];
   warnings: DocumentWarning[];
   incident: IncidentExtension | null;
+  /** Incident profile only. */
+  triage: Triage | null;
 }
 
 // ---------------------------------------------------------------- consolidated report
+
+export interface DocumentGroup {
+  document_ids: string[];
+  reason: string;
+  /** Incident profile: highest member priority, lifted by safety-relevant contradictions. */
+  priority?: Priority | null;
+  priority_reason?: string | null;
+}
 
 export interface ConsolidatedReport {
   overall_summary: string;
@@ -234,7 +295,7 @@ export interface ConsolidatedReport {
   agreements: { point: string; citations: Citation[] }[];
   contradictions: { topic: string; positions: { position: string; citation: Citation }[] }[];
   timeline: { time: string; event: string; citations: Citation[] }[];
-  related_document_groups: { document_ids: string[]; reason: string }[];
+  related_document_groups: DocumentGroup[];
   information_gaps: string[];
   warnings: DocumentWarning[];
   /** Incident profile: pairs that may be the same incident (location missing/unclear). */

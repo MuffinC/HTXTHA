@@ -19,7 +19,7 @@ from app.config import Settings
 from app.llm.base import LLMProvider, LLMRequest, LLMTask
 from app.llm.prompts import load_prompt, render_prompt
 from app.llm.structured import generate_structured
-from app.pipeline import incident_rules
+from app.pipeline import incident_rules, triage_rules
 from app.pipeline.budget import content_budget_tokens, estimate_tokens, truncate_to_tokens
 from app.pipeline.citations import is_valid_page, removed_citations_warning
 from app.schemas.analysis import DocumentAnalysis
@@ -147,13 +147,38 @@ async def consolidate(
         report.contradictions = rule.contradictions
         report.agreements = rule.agreements
         report.timeline = rule.timeline
-        report.related_document_groups = rule.grouping.same_incident
+        report.related_document_groups = _with_group_priorities(
+            rule.grouping.same_incident, rule.contradictions, by_label
+        )
         report.possibly_related_groups = rule.grouping.possibly_related
         report.rule_based = True
         report.rule_summary = incident_rules.grouping_summary(
             rule.grouping, compared=len(by_label) - len(rule.excluded), excluded=len(rule.excluded)
         )
     return report
+
+
+def _with_group_priorities(
+    groups: list[DocumentGroup],
+    contradictions: list[Contradiction],
+    by_label: dict[str, DocumentAnalysis],
+) -> list[DocumentGroup]:
+    """Attach each same-incident group's priority (triage_rules.group_priority)."""
+    triage = {a.document_id: a.triage for a in by_label.values() if a.triage}
+    many = len(groups) > 1
+    result: list[DocumentGroup] = []
+    for i, group in enumerate(groups, start=1):
+        members = {d: triage[d].suggested_priority for d in group.document_ids if d in triage}
+        if not members:
+            result.append(group)
+            continue
+        suffix = f" (incident {i})"
+        own = [c for c in contradictions if not many or c.topic.endswith(suffix)]
+        gp = triage_rules.group_priority(members, own)
+        result.append(
+            group.model_copy(update={"priority": gp.priority, "priority_reason": gp.reason})
+        )
+    return result
 
 
 @dataclass

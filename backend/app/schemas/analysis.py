@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.common import DocumentWarning, Profile
 from app.schemas.incident import IncidentExtension
+from app.schemas.triage import Triage
 from app.schemas.visual import VisualElement
 
 EntityType = Literal[
@@ -85,3 +86,4 @@ class DocumentAnalysis(BaseModel):
     visual_elements: list[VisualElement]
     warnings: list[DocumentWarning]
     incident: IncidentExtension | None = None
+    triage: Triage | None = None

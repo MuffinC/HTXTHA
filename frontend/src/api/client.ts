@@ -4,13 +4,16 @@
 //   * NetworkError: the backend could not be reached at all -> "backend unreachable".
 //   * ApiError: the backend answered with its error envelope -> show code/message.
 import type {
+  AnalystOverride,
   ConfigResponse,
+  FeedbackRequest,
   ErrorEnvelope,
   HealthResponse,
   JobCreatedResponse,
   JobResponse,
   Profile,
   ProfileInfo,
+  TriageReviewRequest,
 } from './types';
 
 export class NetworkError extends Error {
@@ -33,6 +36,8 @@ export class ApiError extends Error {
     this.details = details;
   }
 }
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
@@ -70,4 +75,15 @@ export const api = {
     form.append('profile', profile);
     return request<JobCreatedResponse>('/api/jobs', { method: 'POST', body: form });
   },
+  reviewTriage: (jobId: string, documentId: string, body: TriageReviewRequest) =>
+    request<AnalystOverride>(
+      `/api/jobs/${encodeURIComponent(jobId)}/documents/${encodeURIComponent(documentId)}/triage`,
+      { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(body) },
+    ),
+  feedback: (jobId: string, body: FeedbackRequest) =>
+    request<{ id: number }>(`/api/jobs/${encodeURIComponent(jobId)}/feedback`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    }),
 };

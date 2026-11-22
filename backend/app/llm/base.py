@@ -24,6 +24,7 @@ class LLMTask(StrEnum):
     CHUNK_NOTES = "chunk_notes"  # map step of map-reduce for long documents
     CONSOLIDATION = "consolidation"
     INCIDENT_EXTRACTION = "incident_extraction"  # incident profile: facts for code rules
+    TRIAGE = "triage"  # incident profile: may only raise the rule-based priority
     # Added later: TRIAGE (M7).
 
 

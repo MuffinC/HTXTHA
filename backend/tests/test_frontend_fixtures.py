@@ -37,7 +37,7 @@ from app.config import Settings
 from app.main import create_app
 from tests import pdf_factory
 from tests.conftest import app_client
-from tests.ticket_factory import TICKETS, ticket_pdf
+from tests.ticket_factory import TICKETS, WEAPON_TICKET, ticket_pdf
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "frontend" / "src" / "test" / "fixtures"
 UPDATE = os.environ.get("UPDATE_FRONTEND_FIXTURES") == "1"
@@ -129,11 +129,21 @@ async def test_completed_job_fixture(mock_client: httpx.AsyncClient) -> None:
 
 
 async def test_incident_job_fixture(mock_client: httpx.AsyncClient) -> None:
+    tickets = [*TICKETS, WEAPON_TICKET]
     job = await _run_job(
-        mock_client, [(f"{t.key}.pdf", ticket_pdf(t)) for t in TICKETS], profile="incident"
+        mock_client, [(f"{t.key}.pdf", ticket_pdf(t)) for t in tickets], profile="incident"
     )
     assert job["status"] == "completed"
     assert job["consolidated"]["rule_based"] is True
+    # One analyst override, so the UI tests and screenshots cover "Suggested -> Analyst".
+    t1 = job["documents"][0]["document_id"]
+    review = await mock_client.put(
+        f"/api/jobs/{job['job_id']}/documents/{t1}/triage",
+        json={"action": "override", "priority": "P2", "reason": "Same incident as the P2 reports"},
+    )
+    assert review.status_code == 200, review.text
+    job = (await mock_client.get(f"/api/jobs/{job['job_id']}")).json()
+    job["documents"][0]["analysis"]["triage"]["analyst_override"]["at"] = FIXED_TIME
     check_fixture("jobIncident.ts", "JobResponse", job)
 
 

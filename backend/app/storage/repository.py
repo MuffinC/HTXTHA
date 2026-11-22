@@ -26,6 +26,7 @@ from app.schemas.analysis import DocumentAnalysis
 from app.schemas.common import DocumentWarning, Profile
 from app.schemas.consolidated import ConsolidatedReport
 from app.schemas.jobs import DocumentStatus, ErrorInfo, JobStatus
+from app.schemas.triage import AnalystOverride, FeedbackStats
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -56,6 +57,26 @@ CREATE TABLE IF NOT EXISTS documents (
     updated_at          TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_documents_job ON documents(job_id, position);
+CREATE TABLE IF NOT EXISTS triage_reviews (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id              TEXT NOT NULL REFERENCES jobs(id),
+    document_id         TEXT NOT NULL REFERENCES documents(id),
+    action              TEXT NOT NULL,        -- confirm | override
+    priority            TEXT NOT NULL,        -- the analyst's final priority
+    suggested_priority  TEXT NOT NULL,        -- the suggestion at the time (for agreement)
+    reason              TEXT NOT NULL,
+    created_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_doc ON triage_reviews(document_id, id);
+CREATE TABLE IF NOT EXISTS feedback (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id              TEXT NOT NULL REFERENCES jobs(id),
+    target              TEXT NOT NULL,        -- document | consolidated | section
+    target_id           TEXT NOT NULL,
+    rating              TEXT NOT NULL,        -- up | down
+    comment             TEXT,
+    created_at          TEXT NOT NULL
+);
 """
 
 _FINAL_DOC = (DocumentStatus.COMPLETED, DocumentStatus.REJECTED, DocumentStatus.FAILED)
@@ -301,6 +322,90 @@ class Repository:
         )
 
     # ------------------------------------------------------------------ helpers
+
+    # ------------------------------------------------------------------ triage reviews
+
+    def add_triage_review(
+        self,
+        job_id: str,
+        document_id: str,
+        action: str,
+        priority: str,
+        suggested_priority: str,
+        reason: str,
+    ) -> AnalystOverride:
+        """Store an analyst decision (history is kept; the latest one is shown)."""
+        at = _now()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO triage_reviews (job_id, document_id, action, priority, "
+                "suggested_priority, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (job_id, document_id, action, priority, suggested_priority, reason, at),
+            )
+        return AnalystOverride(
+            action=action,  # type: ignore[arg-type]
+            priority=priority,  # type: ignore[arg-type]
+            reason=reason,
+            at=datetime.fromisoformat(at),
+        )
+
+    def latest_triage_reviews(self, job_id: str) -> dict[str, AnalystOverride]:
+        """document_id -> the latest analyst decision, for one job."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM triage_reviews WHERE job_id = ? ORDER BY id", (job_id,)
+            ).fetchall()
+        return {
+            r["document_id"]: AnalystOverride(
+                action=r["action"],
+                priority=r["priority"],
+                reason=r["reason"],
+                at=datetime.fromisoformat(r["created_at"]),
+            )
+            for r in rows  # later rows overwrite earlier ones
+        }
+
+    # ------------------------------------------------------------------ feedback
+
+    def add_feedback(
+        self, job_id: str, target: str, target_id: str, rating: str, comment: str | None
+    ) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                "INSERT INTO feedback (job_id, target, target_id, rating, comment, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (job_id, target, target_id, rating, comment, _now()),
+            )
+        return int(cursor.lastrowid or 0)
+
+    def feedback_stats(self) -> FeedbackStats:
+        """Rating counts per section/target and the triage agreement rate."""
+        with self._lock:
+            ratings = self._conn.execute(
+                "SELECT target, target_id, rating, COUNT(*) AS n FROM feedback "
+                "GROUP BY target, target_id, rating"
+            ).fetchall()
+            latest = self._conn.execute(
+                "SELECT r.priority, r.suggested_priority FROM triage_reviews r "
+                "JOIN (SELECT document_id, MAX(id) AS id FROM triage_reviews "
+                "GROUP BY document_id) l ON r.id = l.id"
+            ).fetchall()
+        by_key: dict[str, dict[str, int]] = {}
+        for row in ratings:
+            # Sections are aggregated by name across documents; other targets by type.
+            key = f"section:{row['target_id']}" if row["target"] == "section" else row["target"]
+            counts = by_key.setdefault(key, {"up": 0, "down": 0})
+            counts[row["rating"]] += row["n"]
+        reviewed = len(latest)
+        kept = sum(1 for r in latest if r["priority"] == r["suggested_priority"])
+        return FeedbackStats(
+            ratings=by_key,
+            total_up=sum(c["up"] for c in by_key.values()),
+            total_down=sum(c["down"] for c in by_key.values()),
+            triage_reviewed=reviewed,
+            triage_kept=kept,
+            triage_agreement_rate=round(kept / reviewed, 3) if reviewed else None,
+        )
 
     def _touch_job_of(self, document_id: str) -> None:
         """Bump the parent job's ``updated_at`` (caller holds the lock)."""

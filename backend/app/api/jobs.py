@@ -19,6 +19,7 @@ from app.errors import ApiError, ErrorCode
 from app.pipeline.validation import check_file_count, sanitize_filename, validate_file
 from app.pipeline.worker import JobWorker
 from app.profiles import PROFILES, is_available
+from app.schemas.analysis import DocumentAnalysis
 from app.schemas.common import Profile
 from app.schemas.errors import ErrorEnvelope
 from app.schemas.jobs import (
@@ -30,6 +31,13 @@ from app.schemas.jobs import (
     JobResponse,
     ProfileInfo,
 )
+from app.schemas.triage import (
+    AnalystOverride,
+    FeedbackCreated,
+    FeedbackRequest,
+    FeedbackStats,
+    TriageReviewRequest,
+)
 from app.schemas.validation import AcceptedFile, RejectedFile
 from app.storage.repository import JobRecord, NewDocument, Repository
 from app.storage.uploads import UploadStore
@@ -39,6 +47,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["jobs"])
 
 _READ_CHUNK = 1024 * 1024
+#: An override must say why (CLAUDE.md section 9; DECISIONS D-062).
+MIN_REASON_CHARS = 5
 _ERRORS = {400: {"model": ErrorEnvelope}, 422: {"model": ErrorEnvelope}}
 
 
@@ -136,11 +146,80 @@ async def get_job(job_id: str, repo: Repository = Depends(get_repo)) -> JobRespo
     job = repo.get_job(job_id)
     if job is None:
         raise ApiError(ErrorCode.NOT_FOUND, "No job with this ID.", status_code=404)
-    return to_response(job)
+    return to_response(job, repo.latest_triage_reviews(job_id))
 
 
-def to_response(job: JobRecord) -> JobResponse:
-    """Build the API response from stored records."""
+@router.put(
+    "/jobs/{job_id}/documents/{document_id}/triage",
+    response_model=AnalystOverride,
+    responses={404: {"model": ErrorEnvelope}, 422: {"model": ErrorEnvelope}},
+)
+async def review_triage(
+    job_id: str,
+    document_id: str,
+    body: TriageReviewRequest,
+    repo: Repository = Depends(get_repo),
+) -> AnalystOverride:
+    """Confirm the suggested priority, or override it with a required reason."""
+    job = repo.get_job(job_id)
+    doc = next((d for d in job.documents if d.document_id == document_id), None) if job else None
+    if job is None or doc is None:
+        raise ApiError(ErrorCode.NOT_FOUND, "No such job or document.", status_code=404)
+    triage = doc.analysis.triage if doc.analysis else None
+    if triage is None:
+        raise ApiError(
+            ErrorCode.NOT_FOUND,
+            "This document has no triage suggestion (triage is for the incident profile only).",
+            status_code=404,
+        )
+    reason = (body.reason or "").strip()
+    if body.action == "override":
+        if body.priority is None or len(reason) < MIN_REASON_CHARS:
+            raise ApiError(
+                ErrorCode.VALIDATION_ERROR,
+                f"An override needs a priority and a reason of at least {MIN_REASON_CHARS} "
+                "characters.",
+                status_code=422,
+            )
+        priority = body.priority
+    else:
+        priority = triage.suggested_priority
+        reason = reason or "Confirmed the suggested priority."
+    review = repo.add_triage_review(
+        job_id, document_id, body.action, priority, triage.suggested_priority, reason
+    )
+    logger.info(
+        "Triage reviewed",
+        extra={"event": "triage_review", "document_id": document_id, "code": body.action},
+    )
+    return review
+
+
+@router.post(
+    "/jobs/{job_id}/feedback",
+    status_code=201,
+    response_model=FeedbackCreated,
+    responses={404: {"model": ErrorEnvelope}, 422: {"model": ErrorEnvelope}},
+)
+async def add_feedback(
+    job_id: str, body: FeedbackRequest, repo: Repository = Depends(get_repo)
+) -> FeedbackCreated:
+    """Store a thumbs up/down on a section of the results (an evaluation set, not training)."""
+    if repo.get_job(job_id) is None:
+        raise ApiError(ErrorCode.NOT_FOUND, "No job with this ID.", status_code=404)
+    feedback_id = repo.add_feedback(job_id, body.target, body.target_id, body.rating, body.comment)
+    return FeedbackCreated(id=feedback_id)
+
+
+@router.get("/feedback/stats", response_model=FeedbackStats)
+async def feedback_stats(repo: Repository = Depends(get_repo)) -> FeedbackStats:
+    """Rating counts per section and the triage agreement rate."""
+    return repo.feedback_stats()
+
+
+def to_response(job: JobRecord, reviews: dict[str, AnalystOverride] | None = None) -> JobResponse:
+    """Build the API response from stored records, with the latest triage decisions."""
+    reviews = reviews or {}
     return JobResponse(
         job_id=job.job_id,
         profile=job.profile,
@@ -155,13 +234,23 @@ def to_response(job: JobRecord) -> JobResponse:
                 status=d.status,
                 page_count=d.page_count,
                 error=d.error,
-                analysis=d.analysis,
+                analysis=_with_review(d.analysis, reviews.get(d.document_id)),
             )
             for d in job.documents
         ],
         consolidated=job.consolidated,
         consolidated_error=job.consolidated_error,
     )
+
+
+def _with_review(
+    analysis: DocumentAnalysis | None, review: AnalystOverride | None
+) -> DocumentAnalysis | None:
+    """Attach the latest analyst decision to the document's triage."""
+    if analysis is None or analysis.triage is None or review is None:
+        return analysis
+    triage = analysis.triage.model_copy(update={"analyst_override": review})
+    return analysis.model_copy(update={"triage": triage})
 
 
 async def _validate_upload(

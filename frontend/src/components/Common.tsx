@@ -1,8 +1,10 @@
 // Small shared building blocks: section wrapper, AI label, notices, warning banner.
-import { useState, type ReactNode } from 'react';
+import { useContext, useState, type ReactNode } from 'react';
 import type { DocumentWarning } from '../api/types';
 import { WARNING_INFO, plural, type Tone } from '../lib/labels';
+import { FeedbackScopeContext, sectionId } from '../lib/jobActions';
 import { CitationChip } from './Citations';
+import { FeedbackButtons } from './Feedback';
 import { Icon, type IconName } from './Icon';
 
 /** Marks content produced by the local model (CLAUDE.md section 10). */
@@ -35,7 +37,7 @@ export function AiNotice() {
   );
 }
 
-/** A titled section of results. The empty span is the slot for thumbs up/down feedback (M7). */
+/** A titled section of results, with thumbs up/down feedback in its header. */
 export function Section({
   title,
   count,
@@ -45,6 +47,7 @@ export function Section({
   count?: number;
   children: ReactNode;
 }) {
+  const scope = useContext(FeedbackScopeContext);
   return (
     <section className="section" aria-label={title}>
       <header className="section-head">
@@ -52,7 +55,7 @@ export function Section({
           {title}
           {count !== undefined && <span className="count">{count}</span>}
         </h3>
-        <span className="slot-feedback" data-slot="feedback" />
+        <FeedbackButtons target="section" targetId={sectionId(scope, title)} label={title} />
       </header>
       {children}
     </section>

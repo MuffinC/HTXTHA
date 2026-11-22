@@ -37,6 +37,7 @@ from app.llm.structured import generate_structured
 from app.pipeline.budget import content_budget_tokens, estimate_tokens, truncate_to_tokens
 from app.pipeline.citations import is_valid_page, removed_citations_warning
 from app.pipeline.incident import extract_incident
+from app.pipeline.triage import triage_document
 from app.pipeline.visual import page_text_with_visuals
 from app.schemas.analysis import (
     ChunkNotes,
@@ -130,6 +131,7 @@ async def analyse_document(
         raise _failure(exc, settings) from exc
 
     incident = None
+    triage = None
     if profile == "incident":
         try:
             incident, incident_warnings = await extract_incident(
@@ -142,6 +144,18 @@ async def analyse_document(
                 mock_meta=mock_meta,
             )
             warnings.extend(incident_warnings)
+            triage = await triage_document(
+                document_id=document_id,
+                incident=incident,
+                content=content,
+                content_description=description,
+                page_count=page_count,
+                # The document's own text only: model quotes are checked against it.
+                page_texts={p.page: p.text for p in extracted.pages},
+                provider=provider,
+                settings=settings,
+                mock_meta=mock_meta,
+            )
         except LLMError as exc:
             # The core analysis is still useful; say clearly what is missing.
             logger.warning(
@@ -179,6 +193,7 @@ async def analyse_document(
         visual_elements=visual_elements,
         warnings=warnings,
         incident=incident,
+        triage=triage,
         **output.model_dump(),
     )
 
