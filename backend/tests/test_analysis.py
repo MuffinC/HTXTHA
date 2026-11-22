@@ -205,3 +205,20 @@ async def test_short_document_uses_single_pass(settings: Settings) -> None:
     provider = RecordingProvider()
     await _analyse(pdf_factory.long_text_pdf(3), provider, settings)  # default 16k context
     assert provider.calls(LLMTask.CHUNK_NOTES) == []
+
+
+async def test_entities_that_are_only_a_masked_value_are_dropped(settings: Settings) -> None:
+    # Live run (L-015): a contact number listed as a person became "[PHONE REDACTED]".
+    output = _output(
+        key_entities=[
+            {"name": "9123 4567", "type": "person_role", "pages": [1]},
+            {"name": "Driver on 9123 4567", "type": "person_role", "pages": [1]},
+            {"name": "community centre", "type": "location", "pages": [1]},
+        ]
+    )
+    provider = RecordingProvider({LLMTask.DOCUMENT_ANALYSIS: [output]})
+    result = await _analyse(pdf_factory.valid_text_pdf(), provider, settings)
+    assert [e.name for e in result.key_entities] == [
+        "Driver on [PHONE REDACTED]",
+        "community centre",
+    ]

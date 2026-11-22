@@ -471,3 +471,29 @@ def test_lighting_is_compared_coarsely_across_reports() -> None:
 
     assert [c.topic for c in r.compare_group([lit, dark])[0]] == []
     assert [c.topic for c in r.compare_group([lit, day])[0]] == ["Lighting"]
+
+
+# --------------------------------------------------------------------------- grouping summary
+
+
+def test_grouping_summary_counts_incidents_from_the_groups() -> None:
+    t1, t2, t3 = ticket("D1"), ticket("D2", incident_time=time(21, 30)), ticket("D3")
+    t4 = ticket("D4", location="Upper Thomson Road", incident_date=date(2025, 3, 17))
+    grouping = r.group_incidents([t1, t2, t3, t4])
+    assert r.grouping_summary(grouping, compared=4) == (
+        "3 reports describe 1 incident; 1 report describes a separate incident."
+    )
+
+
+def test_grouping_summary_other_shapes() -> None:
+    apart = r.group_incidents(
+        [ticket("D1"), ticket("D2", location="Upper Thomson Road", incident_date=date(2025, 3, 17))]
+    )
+    assert r.grouping_summary(apart, compared=2) == (
+        "2 reports, each describing a separate incident."
+    )
+    possible = r.group_incidents([ticket("D1"), ticket("D2", location=None)])
+    assert "1 pair may be related (not confirmed)" in r.grouping_summary(possible, compared=2)
+    assert r.grouping_summary(apart, compared=2, excluded=1).endswith(
+        "1 report could not be compared."
+    )

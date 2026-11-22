@@ -288,7 +288,8 @@ const fixture: JobResponse = {
     ],
     "warnings": [],
     "possibly_related_groups": [],
-    "rule_based": false
+    "rule_based": false,
+    "rule_summary": null
   },
   "consolidated_error": null
 };

@@ -274,3 +274,11 @@ async def test_report_without_incident_facts_is_named_in_the_consolidated_warnin
     # The other two reports of the incident are still grouped and compared.
     [group] = report["related_document_groups"]
     assert len(group["document_ids"]) == 2
+
+
+async def test_consolidated_report_opens_with_a_rule_based_count(
+    ticket_job: dict[str, Any],
+) -> None:
+    assert ticket_job["consolidated"]["rule_summary"] == (
+        "3 reports describe 1 incident; 1 report describes a separate incident."
+    )

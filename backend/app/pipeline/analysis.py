@@ -48,7 +48,7 @@ from app.schemas.common import DocumentWarning, Profile, WarningCode
 from app.schemas.extraction import ExtractedDocument
 from app.schemas.visual import VisualElement
 from app.security.boundary import wrap_untrusted
-from app.security.pii import mask_pii_in
+from app.security.pii import is_only_mask, mask_pii_in
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +162,14 @@ async def analyse_document(
         warnings.append(warning)
     if settings.mask_pii:
         output = DocumentAnalysisModelOutput.model_validate(mask_pii_in(output.model_dump()))
+        # An entity that was only a phone number or NRIC is now just a placeholder:
+        # noise in the entity list, so it is dropped (L-015).
+        output = output.model_copy(
+            update={
+                "key_entities": [e for e in output.key_entities if not is_only_mask(e.name)],
+                "main_topics": [t for t in output.main_topics if not is_only_mask(t)],
+            }
+        )
 
     return DocumentAnalysis(
         document_id=document_id,

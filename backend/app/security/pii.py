@@ -33,6 +33,14 @@ _SG_PHONE = re.compile(r"(?<![\w+])(?:\+?65[\s-]?)?[3689]\d{3}[\s-]?\d{4}(?!\w)"
 _INTL_PHONE = re.compile(r"(?<![\w+])\+\d{1,3}(?:[\s-]?\d){7,12}(?!\w)")
 
 
+_ONLY_MASKS = re.compile(rf"^[\W_]*(?:(?:{re.escape(NRIC_MASK)}|{re.escape(PHONE_MASK)})[\W_]*)+$")
+
+
+def is_only_mask(text: str) -> bool:
+    """True if ``text`` is nothing but masking placeholders and punctuation."""
+    return bool(_ONLY_MASKS.match(text))
+
+
 def mask_pii(text: str) -> str:
     """Replace NRIC/FIN and phone numbers in ``text`` with fixed placeholders."""
     text = _NRIC.sub(NRIC_MASK, text)

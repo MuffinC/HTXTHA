@@ -150,6 +150,9 @@ async def consolidate(
         report.related_document_groups = rule.grouping.same_incident
         report.possibly_related_groups = rule.grouping.possibly_related
         report.rule_based = True
+        report.rule_summary = incident_rules.grouping_summary(
+            rule.grouping, compared=len(by_label) - len(rule.excluded), excluded=len(rule.excluded)
+        )
     return report
 
 

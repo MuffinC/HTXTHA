@@ -178,7 +178,11 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   incident profile** the comparisons are made by rule, and the scorecard was perfect in 5 of 5
   runs (D-060). The overall summary is still written by the model, and can contradict the rule
   findings shown beside it (in one real-model run it called one incident reported three times
-  "three incidents"). The analyst should trust the rule-based sections over the summary prose.
+  "three incidents"). **Mitigated:** a code-generated opening line from the grouping, such as
+  "3 reports describe 1 incident; 1 report describes a separate incident.", is shown above the
+  model's summary with a Rule-based tag (`ConsolidatedReport.rule_summary`), so the count
+  itself can never contradict the groups. The model's prose may still be inaccurate in other
+  ways.
 - L-008: Jobs run one at a time from an in-memory queue. A large upload delays everything
   queued behind it, and a restart loses queued work (A-117). Acceptable for one analyst; a
   multi-user deployment would need a persistent queue.
@@ -201,6 +205,8 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - L-014: The mock provider's incident extraction is keyword matching tuned to the sample ticket
   layout. It demonstrates the UI and rules on the sample tickets but extracts little from
   arbitrary documents.
-- L-015: The general analysis can list a PII placeholder as an entity (for example a masked
-  contact number appearing as "phone redacted" under People). The masking itself works; the
-  placeholder is cosmetic noise in the entity list.
+- L-015: The general analysis listed a masked contact number as a person entity ("phone
+  redacted" under People). **Fixed:** after masking, entities and topics that consist only of
+  masking placeholders (`[PHONE REDACTED]`, `[NRIC/FIN REDACTED]`, plus punctuation) are dropped
+  deterministically, like the pipeline-marker filter (`pii.is_only_mask`). Entities that merely
+  contain a placeholder, such as "Driver on [PHONE REDACTED]", are kept.

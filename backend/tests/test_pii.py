@@ -56,3 +56,18 @@ def test_mask_pii_in_nested_structures() -> None:
     assert masked["page"] == 3
     assert masked["flags"] == ("ok", None)
     assert "S1234567D" in masked
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("[PHONE REDACTED]", True),
+        (" [NRIC/FIN REDACTED], [PHONE REDACTED] ", True),
+        ("Call [PHONE REDACTED]", False),
+        ("Driver", False),
+    ],
+)
+def test_is_only_mask(text: str, expected: bool) -> None:
+    from app.security.pii import is_only_mask
+
+    assert is_only_mask(text) is expected

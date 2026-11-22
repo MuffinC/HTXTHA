@@ -241,6 +241,8 @@ export interface ConsolidatedReport {
   possibly_related_groups: { document_ids: string[]; reason: string }[];
   /** True when contradictions, agreements, timeline and groups were computed by rule. */
   rule_based: boolean;
+  /** Incident profile: code-generated count of incidents, shown above the model summary. */
+  rule_summary: string | null;
 }
 
 // ---------------------------------------------------------------- jobs

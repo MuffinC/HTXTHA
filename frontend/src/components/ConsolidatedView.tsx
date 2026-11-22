@@ -56,6 +56,11 @@ export function ConsolidatedView({ report, documentCount }: { report: Consolidat
       <WarningBanner warnings={report.warnings} />
 
       <Section title="Overall summary">
+        {report.rule_summary && (
+          <p className="rule-summary">
+            <RuleTag /> {report.rule_summary}
+          </p>
+        )}
         <p className="lead">
           <ModelText text={report.overall_summary} />
         </p>
