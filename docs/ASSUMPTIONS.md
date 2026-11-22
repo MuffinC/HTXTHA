@@ -190,8 +190,12 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   "three incidents"). **Mitigated:** a code-generated opening line from the grouping, such as
   "3 reports describe 1 incident; 1 report describes a separate incident.", is shown above the
   model's summary with a Rule-based tag (`ConsolidatedReport.rule_summary`), so the count
-  itself can never contradict the groups. The model's prose may still be inaccurate in other
-  ways.
+  itself can never contradict the groups. **Also mitigated (D-079):** in the GPU Docker run the
+  model's summary said "No photos were attached to any report" although T4 has one. The opening
+  line now also states which reports include photos ("1 report includes photos (D4)."),
+  computed from the visual elements, and the same fact is given to the model as a rule-based
+  finding. A photo whose visual analysis failed is not counted. The model's prose may still be
+  inaccurate in other ways.
 - L-008: Jobs run one at a time from an in-memory queue. A large upload delays everything
   queued behind it, and a restart loses queued work (A-117). Acceptable for one analyst; a
   multi-user deployment would need a persistent queue.

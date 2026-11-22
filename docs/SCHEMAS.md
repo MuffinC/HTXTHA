@@ -204,8 +204,11 @@ after one retry), `LLM_TIMEOUT`, `LLM_UNAVAILABLE`, `LLM_REFUSED`, `INTERNAL_ERR
 `damage_locations[]`, `traffic_signal` (closed lists, each with `unclear`), and
 `timestamp_visible` (as shown). The model must answer every field.
 
-`ConsolidatedReport` (**additions**): `possibly_related_groups` (`DocumentGroup[]`) and
-`rule_based` (`true` when contradictions, agreements, timeline and groups were computed by rule).
+`ConsolidatedReport` (**additions**): `possibly_related_groups` (`DocumentGroup[]`),
+`rule_based` (`true` when contradictions, agreements, timeline and groups were computed by rule)
+and `rule_summary` (`string | null`): a code-generated opening line with the incident count and
+the reports that include photos, e.g. "3 reports describe 1 incident; 2 reports describe
+separate incidents. 1 report includes photos (D4)." (L-007, D-079).
 For the incident profile the model only writes `overall_summary`, `common_themes` and
 `information_gaps` (`IncidentNarrativeOutput`).
 

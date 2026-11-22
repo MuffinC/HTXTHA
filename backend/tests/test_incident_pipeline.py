@@ -280,5 +280,16 @@ async def test_consolidated_report_opens_with_a_rule_based_count(
     ticket_job: dict[str, Any],
 ) -> None:
     assert ticket_job["consolidated"]["rule_summary"] == (
-        "3 reports describe 1 incident; 1 report describes a separate incident."
+        "3 reports describe 1 incident; 1 report describes a separate incident. "
+        "1 report includes photos (D4)."
     )
+
+
+async def test_consolidation_prompt_states_which_reports_have_photos(settings: Settings) -> None:
+    # L-007: a live summary said no report had photos although T4 has one.
+    provider = RecordingProvider()
+    async with app_client(create_app(settings, provider=provider)) as client:
+        await _run_job(client, [(f"{t.key}.pdf", ticket_pdf(t)) for t in TICKETS])
+    [request] = provider.calls(LLMTask.CONSOLIDATION)
+    assert "- Reports with photos: D4. Reports without photos: D1, D2, D3." in request.prompt
+    assert 'follow the "Reports with photos" finding' in request.prompt

@@ -1198,7 +1198,7 @@ const fixture: JobResponse = {
     "warnings": [],
     "possibly_related_groups": [],
     "rule_based": true,
-    "rule_summary": "3 reports describe 1 incident; 2 reports describe separate incidents."
+    "rule_summary": "3 reports describe 1 incident; 2 reports describe separate incidents. 1 report includes photos (D4)."
   },
   "consolidated_error": null
 };

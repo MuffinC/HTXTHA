@@ -40,10 +40,20 @@ export function TopBar({ health }: { health: HealthState }) {
             MOCK
           </span>
         )}
-        <span className={`pill tone-${pill.tone}`} role="status" aria-live="polite">
+        <span
+          className={`pill tone-${pill.tone}`}
+          role="status"
+          aria-live="polite"
+          title={pill.detail ? `${pill.text}: ${pill.detail}` : pill.text}
+        >
           <Icon name={pill.icon} />
           <span>{pill.text}</span>
-          {pill.detail && <span className="pill-detail">{pill.detail}</span>}
+          {/* Truncated with an ellipsis when the bar is narrow; the tooltip has it in full. */}
+          {pill.detail && (
+            <span className="pill-detail" title={pill.detail}>
+              {pill.detail}
+            </span>
+          )}
         </span>
       </div>
     </header>

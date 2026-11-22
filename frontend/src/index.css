@@ -78,10 +78,10 @@ code { font-size: 0.92em; background: var(--neutral-soft); padding: 0 4px; borde
 /* ---------------------------------------------------------------- top bar */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  height: 52px; padding: 0 20px;
+  gap: 16px; height: 52px; padding: 0 20px;
   background: #16212e; color: #e9edf2;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .brand-mark {
   display: grid; place-items: center; width: 28px; height: 28px;
   border-radius: var(--radius-sm); background: var(--accent); color: #fff;
@@ -91,9 +91,14 @@ code { font-size: 0.92em; background: var(--neutral-soft); padding: 0 4px; borde
   font-family: var(--font-mono); font-size: 11.5px; color: #93a0b1;
   padding-left: 10px; border-left: 1px solid #334152;
 }
-.topbar-right { display: flex; align-items: center; gap: 10px; }
+/* The right side may shrink; inside the pill only the model name gives way (ellipsis,
+   full name in the tooltip), so the pill always fits the bar. */
+.topbar-right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+.topbar-right > * { flex: none; }
+.topbar-right > .pill { flex: 0 1 auto; }
 .pill {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
+  white-space: nowrap;
   padding: 3px 10px; border-radius: 999px; font-size: 12.5px;
   background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -102,7 +107,19 @@ code { font-size: 0.92em; background: var(--neutral-soft); padding: 0 4px; borde
 .pill.tone-warning .icon { color: #f2b544; }
 .pill.tone-danger .icon { color: #ff8a80; }
 .pill.tone-neutral .icon { color: #b3bdc9; }
-.pill-detail { font-family: var(--font-mono); font-size: 11.5px; color: #a8b3c1; }
+.pill-detail {
+  font-family: var(--font-mono); font-size: 11.5px; color: #a8b3c1;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+@media (max-width: 640px) { .brand-sub { display: none; } }
+/* Very narrow screens: keep the logo mark, hide the wordmark visually (still read by
+   screen readers) so the status pill always has room. */
+@media (max-width: 420px) {
+  .brand-name {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
 .badge {
   font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
   padding: 2px 7px; border-radius: var(--radius-sm);

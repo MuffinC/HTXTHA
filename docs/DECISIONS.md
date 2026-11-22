@@ -1569,6 +1569,30 @@ All tunable values are named constants at the top of `incident_rules.py`.
   originals locally accepts both with `LEADING_BYTES_IGNORED` (149 bytes each), and the 2023 note also with `ACTIVE_CONTENT`.
 - **Milestone:** post-M9 follow-up
 
+## D-079 Photo count in the rule-based opening line; status pill fits narrow windows
+
+- **Photo count.** In the author's GPU Docker run (five tickets, incident profile), the model's
+  summary said "No photos were attached to any report", although T4 has a photo.
+  - `incident_rules.photo_summary` adds a sentence to `rule_summary`: "1 report includes photos
+    (D4).", "2 reports include photos (D1, D4).", or "No report includes photos." It is computed
+    from each report's visual elements of type `photo` (stage 2), so a photo whose visual
+    analysis failed is not counted.
+  - The same fact opens the rule-based findings in the consolidation prompt ("- Reports with
+    photos: D4. Reports without photos: D1, D2, D3.") with one instruction: "If you mention
+    photos, follow the "Reports with photos" finding." Only labels, no document text, so it
+    stays outside the untrusted-content markers like the other findings.
+  - Tests: `photo_summary` shapes; the five-ticket mock job's opening line; the consolidation
+    prompt carrying the photo finding. L-007 updated.
+- **Status pill.** The "Model ready" pill was cut off at narrower window widths. The top bar's
+  right side may now shrink; inside the pill only the detail (the model name, or "downloading,
+  or Ollama is not running") gives way, with an ellipsis, and the full text is in a tooltip on
+  the detail and on the pill. Below 640 px the "HTX · local AI" subtitle is hidden, and below
+  420 px the wordmark is hidden visually (the logo mark stays, and screen readers still read the
+  name). Checked by rendering the production CSS at 320–900 px: the pill fits at every width,
+  showing the full model name down to 360 px and truncating it at 320 px. Test:
+  `TopBar.test.tsx` (full name kept in the tooltip of the truncating element).
+- **Milestone:** post-M9 follow-up
+
 ---
 
 ## Pending decisions (to record when made)

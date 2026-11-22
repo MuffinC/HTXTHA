@@ -509,6 +509,13 @@ def test_grouping_summary_other_shapes() -> None:
     )
 
 
+def test_photo_summary() -> None:
+    assert r.photo_summary(["D4"], total=4) == "1 report includes photos (D4)."
+    assert r.photo_summary(["D1", "D4"], total=4) == "2 reports include photos (D1, D4)."
+    assert r.photo_summary([], total=4) == "No report includes photos."
+    assert r.photo_summary([], total=1) == "The report includes no photos."
+
+
 # --------------------------------------------------------------------------- weapon negation
 
 

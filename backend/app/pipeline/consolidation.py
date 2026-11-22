@@ -152,8 +152,15 @@ async def consolidate(
         )
         report.possibly_related_groups = rule.grouping.possibly_related
         report.rule_based = True
-        report.rule_summary = incident_rules.grouping_summary(
-            rule.grouping, compared=len(by_label) - len(rule.excluded), excluded=len(rule.excluded)
+        report.rule_summary = " ".join(
+            [
+                incident_rules.grouping_summary(
+                    rule.grouping,
+                    compared=len(by_label) - len(rule.excluded),
+                    excluded=len(rule.excluded),
+                ),
+                incident_rules.photo_summary(rule.with_photos, total=len(by_label)),
+            ]
         )
     return report
 
@@ -192,6 +199,8 @@ class IncidentRuleFindings:
     findings: str
     #: Labels of documents whose incident extraction failed (not compared).
     excluded: list[str]
+    #: Labels of documents with at least one photo element (stage 2).
+    with_photos: list[str]
 
 
 def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRuleFindings:
@@ -226,7 +235,16 @@ def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRu
     # Plain-text findings for the prompt. Only labels, field names and closed-list
     # values: no quoted document text appears outside the untrusted-content markers.
     labels_by_id = {t.document_id: t.label for t in tickets}
-    lines: list[str] = []
+    # Photos, from the visual elements. Stated explicitly because a live summary claimed
+    # "no photos were attached to any report" when one had a photo (L-007).
+    with_photos = [
+        label for label, a in by_label.items() if any(v.type == "photo" for v in a.visual_elements)
+    ]
+    without = [label for label in by_label if label not in with_photos]
+    lines: list[str] = [
+        f"- Reports with photos: {', '.join(with_photos) or 'none'}. "
+        f"Reports without photos: {', '.join(without) or 'none'}."
+    ]
     grouped: set[str] = set()
     for group in grouping.groups:
         lines.append(f"- Same incident: {', '.join(t.label for t in group)}.")
@@ -244,7 +262,7 @@ def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRu
         lines.append(f"- Contradiction on {c.topic}: {values}.")
     for a in agreements:
         lines.append(f"- Agreement: {a.point.split(' (every')[0]}.")
-    if not lines:
+    if len(lines) == 1:  # only the photo line: nothing was compared
         lines.append("- No incident facts could be compared.")
     return IncidentRuleFindings(
         grouping=grouping,
@@ -253,6 +271,7 @@ def _incident_rule_findings(by_label: dict[str, DocumentAnalysis]) -> IncidentRu
         timeline=incident_rules.build_timeline(tickets),
         findings="\n".join(lines),
         excluded=[label for label, a in by_label.items() if a.incident is None],
+        with_photos=with_photos,
     )
 
 
