@@ -10,6 +10,9 @@ builders the tests and the live scorecard use). Each ticket is a two-page e-repo
 Singapore roads, but the events, reporters and reference numbers are invented, and the contact numbers
 are obvious placeholders. Every page carries a "SYNTHETIC SAMPLE" footer.
 
+Licence: generated for this project. The only third-party content is the public-domain photo in
+`t4_unrelated_tree.pdf` (attribution below).
+
 Regenerate (from the repo root, backend environment active):
 
 ```bash
@@ -27,13 +30,15 @@ python scripts/generate_sample_tickets.py
 Expected results (`ticket_factory.PLANTED`):
 
 - **Groups:** T1, T2 and T3 are the same incident (same date, times within 60 minutes,
-  matching place words). T4 is separate (different date and place).
+  matching place words). T4 is separate (different date and place). Uploaded together with the
+  other four, T5 is also separate (different date, place and category), so the consolidated
+  report opens with "3 reports describe 1 incident; 2 reports describe separate incidents."
 - **Contradictions in that incident:** time (21:15, 21:30, 21:20), traffic light, number of
   vehicles, weather, injuries, and a party leaving the scene. There is **no** traffic-light
   position for T3, because absence is not a contradiction.
 - **T4, narrative against its own photo:** inconsistent on weather and on lighting.
 - **Triage (incident profile):** T1 P3, T2 P2 (injury and a party drove off), T3 P2 (injury),
-  T4 P3. The T1–T3 group is P2: its highest report is P2, and its contradictions on safety
+  T4 P3, T5 P1. The T1–T3 group is P2: its highest report is P2, and its contradictions on safety
   fields (traffic light, injuries, a party leaving, vehicle count) need follow-up; the time
   and weather differences are listed but do not lift it. T5 is kept out of the four-ticket set:
   its knife is extracted as the weapon fact (quote checked on the page), which gives a P1 rule

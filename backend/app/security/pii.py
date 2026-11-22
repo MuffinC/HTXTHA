@@ -41,11 +41,30 @@ def is_only_mask(text: str) -> bool:
     return bool(_ONLY_MASKS.match(text))
 
 
-def mask_pii(text: str) -> str:
-    """Replace NRIC/FIN and phone numbers in ``text`` with fixed placeholders."""
+# A UUID's middle groups can look like a hyphenated phone number ("...-8123-4567-..."),
+# and the hyphens satisfy the boundary rule above. UUID spans are never masked (D-070).
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
+
+
+def _mask_plain(text: str) -> str:
     text = _NRIC.sub(NRIC_MASK, text)
     text = _SG_PHONE.sub(PHONE_MASK, text)
     return _INTL_PHONE.sub(PHONE_MASK, text)
+
+
+def mask_pii(text: str) -> str:
+    """Replace NRIC/FIN and phone numbers in ``text`` with fixed placeholders.
+
+    UUIDs are left exactly as they are, wherever they appear in the text.
+    """
+    parts: list[str] = []
+    last = 0
+    for match in _UUID.finditer(text):
+        parts.append(_mask_plain(text[last : match.start()]))
+        parts.append(match.group(0))
+        last = match.end()
+    parts.append(_mask_plain(text[last:]))
+    return "".join(parts)
 
 
 def mask_pii_in[T](value: T) -> T:

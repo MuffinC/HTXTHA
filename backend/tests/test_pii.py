@@ -34,6 +34,9 @@ def test_pii_masked(text: str, expected: str) -> None:
         "A1234567B is not an NRIC prefix.",
         # Regression (D-053): a UUID whose hex contains a phone-like digit run.
         "a75d14ec-072e-4838-84d5-cb96609844e7",
+        # Regression (D-070): middle groups that look like a hyphenated phone number.
+        "276f5946-8123-4567-ba66-ca50c54928dc",
+        "see document 276f5946-8123-4567-ba66-ca50c54928dc page 1",
         "ref ab91234567cd",
     ],
 )
@@ -71,3 +74,8 @@ def test_is_only_mask(text: str, expected: bool) -> None:
     from app.security.pii import is_only_mask
 
     assert is_only_mask(text) is expected
+
+
+def test_text_around_a_uuid_is_still_masked() -> None:
+    text = "Call 9123 4567 about 276f5946-8123-4567-ba66-ca50c54928dc."
+    assert mask_pii(text) == "Call [PHONE REDACTED] about 276f5946-8123-4567-ba66-ca50c54928dc."

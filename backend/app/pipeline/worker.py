@@ -89,10 +89,6 @@ class JobWorker:
     def enqueue(self, job_id: str) -> None:
         self._queue.put_nowait(job_id)
 
-    async def wait_idle(self) -> None:
-        """Wait until every enqueued job has been processed (used by tests)."""
-        await self._queue.join()
-
     # ------------------------------------------------------------------ processing
 
     async def _run(self) -> None:

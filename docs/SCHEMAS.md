@@ -127,7 +127,8 @@ the rest come from the model and are validated, citation-checked and PII-masked.
 | `visual_elements` (P) | `VisualElement[]` | From stage 2 |
 | `warnings` (P) | `Warning[]` | Upload, extraction, visual and analysis warnings |
 
-`incident` (M6) and `triage` (M7) are documented below; `statistical` arrives in M8.
+`incident` (M6) and `triage` (M7) are documented below. The spec's `statistical` field is not
+defined, because the statistical profile was not built (DECISIONS D-069).
 
 ### `ConsolidatedReport` — `app/schemas/consolidated.py`
 
@@ -243,8 +244,6 @@ Model output (`TriageModelOutput`, sent as Ollama `format`): `{proposed_priority
   triage_reviewed, triage_kept, triage_agreement_rate: float | null}`. Keys are
   `section:<target_id>` for sections, otherwise the target name.
 
-## Planned (to be documented as implemented)
+## Not implemented
 
-| Schema | Milestone |
-|---|---|
-| `StatisticalExtension` | M8 |
+- `StatisticalExtension` and the page-preview endpoint (M8 was skipped, DECISIONS D-069).

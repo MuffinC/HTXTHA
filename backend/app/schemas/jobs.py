@@ -30,10 +30,6 @@ class DocumentStatus(StrEnum):
     FAILED = "failed"  # failed during processing
 
 
-#: Statuses after which a job or document never changes again.
-FINAL_JOB_STATUSES = {JobStatus.COMPLETED, JobStatus.PARTIAL, JobStatus.FAILED}
-
-
 class ErrorInfo(BaseModel):
     """Why a document or job failed. ``message`` is written by the backend, never the model."""
 

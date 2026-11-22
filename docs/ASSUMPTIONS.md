@@ -59,9 +59,9 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
 - A-114: Stage 2 runs one page at a time (the spec's concurrency of 1). The timings in D-023
   were measured on the author's RTX 3070 8 GB with desktop apps open. Other GPUs, and
   CPU-only machines, will differ a lot.
-- A-115: Only the General profile is accepted in M3. Incident (M6) and statistical (M8) are
-  listed by `GET /api/profiles` with `available: false`, and uploads with them get 400
-  `UNSUPPORTED_PROFILE`.
+- A-115: `GET /api/profiles` lists all three profiles. General and incident are available.
+  Statistical is listed with `available: false` (M8 was skipped, DECISIONS D-069), and uploads
+  with it get 400 `UNSUPPORTED_PROFILE`.
 - A-116: A job with only one successfully analysed document has no consolidated report
   (`consolidated_error.code = SINGLE_DOCUMENT`). Files rejected at upload do not make a job
   `partial`; they are reported in the `POST` response and stored as `rejected` documents.
@@ -178,7 +178,8 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   are visible, and gave no inferences. A prompt asking for those details made it state
   cause as fact, so that prompt was reverted (D-031). It can also misread small values or
   miscount objects. All visual output is labelled AI-generated and is meant to be checked
-  against the page (page previews arrive in M8). A larger model would likely do better
+  against the page (the page drawer lists the cited items; page images are not shown, see
+  L-021). A larger model would likely do better
   (untested).
 - L-007: Consolidated-report quality. **Under the general profile** the 4B model's own
   comparison is unstable (DECISIONS D-042): the traffic light was found in 1 of 14 runs, there
@@ -231,6 +232,9 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   **Partly mitigated (D-068):** a quote that names a weapon only to deny it ("no weapon was
   involved") is no longer accepted as raise evidence. Other unsupportive quotes can still
   ground a raise; the analyst sees the quote and the page chip.
+- L-018: The mock provider's triage raise is a weapon keyword match. It exercises the grounding
+  path in tests, but on the sample tickets it changes nothing since D-068 (T5 is already P1 by
+  rule). It says nothing about real model quality.
 - L-019: In the M7 live run, the 4B model did not raise the knife ticket (T5) to P1; it
   stayed at the rule floor, P2. **Addressed (D-068):** weapon is now an extracted,
   quote-grounded fact, and weapon = yes gives a P1 rule floor. In the live re-run, T5 came out P1 from the rule floor, with the
@@ -242,5 +246,6 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   ("I can't say he didn't have a knife") or a negation about something else in the same quote
   ("The knife was not his") can flip the value wrongly. The second case errs towards no; the
   analyst sees the quote either way.
-- L-018: The mock provider's triage raise is a weapon keyword match. It demonstrates the
-  grounding path on the sample tickets but says nothing about real model quality.
+- L-021: No page images. A citation chip opens a drawer listing everything the analysis says
+  about that page, but the page itself is not rendered (M8 skipped, DECISIONS D-069). To see
+  the original, the analyst opens the PDF at the cited page.

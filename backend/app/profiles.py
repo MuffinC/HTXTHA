@@ -27,7 +27,7 @@ PROFILES: list[ProfileInfo] = [
         id="statistical",
         name="Statistical",
         description="Statistical reports: reporting period, key figures and trends.",
-        available=False,  # statistical extension arrives in M8
+        available=False,  # listed as "coming later": M8 was skipped (DECISIONS D-069)
     ),
 ]
 

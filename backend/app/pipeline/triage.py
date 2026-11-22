@@ -20,7 +20,7 @@ from app.pipeline import triage_rules as rules
 from app.schemas.incident import IncidentExtension
 from app.schemas.triage import Triage, TriageModelOutput
 from app.security.boundary import wrap_untrusted
-from app.security.pii import mask_pii_in
+from app.security.pii import mask_pii
 
 logger = logging.getLogger(__name__)
 
@@ -94,9 +94,24 @@ async def triage_document(
         rule_priority=floor.priority,
         model_priority=escalation.priority,
     )
-    if settings.mask_pii:
-        triage = Triage.model_validate(mask_pii_in(triage.model_dump()))
-    return triage
+    return _mask_text(triage) if settings.mask_pii else triage
+
+
+def _mask_text(triage: Triage) -> Triage:
+    """Mask PII in the free text only (model quotes can contain a phone number).
+
+    Citations carry document IDs and are never masked: masking the whole dump once
+    turned a UUID like "...-8123-4567-..." into "[PHONE REDACTED]" (DECISIONS D-070).
+    """
+    return triage.model_copy(
+        update={
+            "rationale": mask_pii(triage.rationale),
+            "triggering_factors": [
+                f.model_copy(update={"factor": mask_pii(f.factor)})
+                for f in triage.triggering_factors
+            ],
+        }
+    )
 
 
 def _rule_confidence(floor: rules.RuleResult) -> str:

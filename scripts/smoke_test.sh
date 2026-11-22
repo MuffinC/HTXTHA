@@ -6,15 +6,21 @@
 #
 # Usage:  ./scripts/smoke_test.sh [base_url] [timeout_seconds]
 #         ./scripts/smoke_test.sh http://127.0.0.1:8080 120
-# Needs: curl, python3 (for JSON parsing; present on GitHub runners and in the backend venv).
+# Needs: curl, and python3 or python (for JSON parsing; present on GitHub runners and in the
+# backend venv). Override with PYTHON=/path/to/python.
 set -euo pipefail
 
 BASE="${1:-http://127.0.0.1:8080}"
 TIMEOUT="${2:-120}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SAMPLES="$REPO_ROOT/sample_pdfs/adversarial"
-PY="${PYTHON:-python3}"
-command -v "$PY" >/dev/null 2>&1 || PY=python
+# Pick the first interpreter that actually runs. On Windows, "python3" is often the
+# Microsoft Store alias, which exists on PATH but only prints an install hint.
+PY=""
+for candidate in ${PYTHON:-} python3 python; do
+  if "$candidate" -c "import json" >/dev/null 2>&1; then PY="$candidate"; break; fi
+done
+[ -n "$PY" ] || { echo "SMOKE TEST FAILED: no working python3/python found (set PYTHON=...)" >&2; exit 1; }
 
 json() { "$PY" -c "import sys, json; d = json.load(sys.stdin); print($1)"; }
 fail() { echo "SMOKE TEST FAILED: $*" >&2; exit 1; }

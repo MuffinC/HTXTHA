@@ -9,13 +9,21 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$REPO_ROOT/backend"
-PYTHON="${PYTHON:-python3}"
-
-# The backend targets Python 3.12 (matches the Docker image and CI).
-if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 12) else 1)'; then
-  echo "Python 3.12+ is required (found: $("$PYTHON" --version 2>&1)). Set PYTHON=/path/to/python3.12." >&2
+# The backend targets Python 3.12 (matches the Docker image and CI). Take the first
+# candidate that runs and is 3.12+. On Windows (Git Bash), "python3" is often the
+# Microsoft Store alias, which is on PATH but only prints an install hint.
+PYTHON_FOUND=""
+for candidate in ${PYTHON:-} python3 python; do
+  if "$candidate" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 12) else 1)' >/dev/null 2>&1; then
+    PYTHON_FOUND="$candidate"
+    break
+  fi
+done
+if [ -z "$PYTHON_FOUND" ]; then
+  echo "Python 3.12+ is required and was not found as python3 or python. Set PYTHON=/path/to/python3.12." >&2
   exit 1
 fi
+PYTHON="$PYTHON_FOUND"
 
 echo "Creating virtual environment in $BACKEND_DIR/.venv"
 "$PYTHON" -m venv "$BACKEND_DIR/.venv"

@@ -2,7 +2,7 @@
 //
 // Every claim the AI makes cites a document and page (principle 3). Clicking a
 // chip opens a side drawer for that page listing everything the analysis says
-// about it. Rendered page images are added to this drawer in M8.
+// about it. Rendered page images are not shown (M8 was skipped: DECISIONS D-069).
 import { useContext, useEffect, useRef, type ReactNode } from 'react';
 import type { Citation, JobResponse } from '../api/types';
 import { CitationContext, type JobDocs } from '../lib/citations';
@@ -137,10 +137,9 @@ export function PageDrawer({
           </button>
         </header>
 
-        {/* M8 adds the rendered page image here. */}
         <div className="page-placeholder">
           <Icon name="page" />
-          <span>Page preview is not available yet. The items below cite this page.</span>
+          <span>Page images are not shown. Open the PDF at this page to see the original; the items below cite it.</span>
         </div>
 
         {warnings.length > 0 && (

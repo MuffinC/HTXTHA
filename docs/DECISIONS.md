@@ -622,7 +622,7 @@ fail.
 - **Field name:** `files`, repeated once per file. This is what the spec's `files[]` notation
   means, and it is the standard multipart convention. `profile` defaults to `general`.
 - **Profiles:** `GET /api/profiles` lists all three with an `available` flag. Only `general`
-  is available in M3. Incident arrives in M6 and statistical in M8. Unavailable profiles are
+  is available in M3. Incident arrives in M6 and statistical in M8 (M8 was skipped, D-069). Unavailable profiles are
   rejected with 400 `UNSUPPORTED_PROFILE`, and an unknown profile string gets 422.
 - **Size limits in two layers:** a middleware refuses any POST whose `Content-Length`
   exceeds `MAX_FILES × MAX_FILE_MB + 1 MB` with 413 `FILE_TOO_LARGE`, before the body is
@@ -631,7 +631,7 @@ fail.
 - **Storage:** accepted files are written to `<DATA_DIR>/uploads/<uuid>.pdf`
   (`UploadStore.path` refuses anything that is not a UUID) and deleted once their document is
   processed, unless `RETAIN_UPLOADS=true`. Page previews (M8) will need this setting or a
-  rendered-page cache.
+  rendered-page cache. (Not built: M8 was skipped, D-069.)
 - **Live end-to-end** (`tests/integration/test_ollama_e2e.py`): two synthetic reports of the
   same incident (3 pages, 1 photo) took **45.8 s** from upload to completed. That breaks down
   as 1 visual call, 2 analysis calls and 1 consolidation call on the RTX 3070 with flash
@@ -805,7 +805,7 @@ fail.
   tabular numerals are on everywhere.
 - **Milestone:** M4
 
-## D-049 Citation chips open a page drawer now; M8 adds the page image
+## D-049 Citation chips open a page drawer now; M8 adds the page image (M8 skipped: D-069)
 
 - Every `p.N` chip (`D2 p.1` in the consolidated view) opens a side drawer for that page, listing
   everything that cites it: warnings, notable points, visual elements (graphic ones stay
@@ -1160,7 +1160,8 @@ All tunable values are named constants at the top of `incident_rules.py`.
   **Rule-based** tag explaining the rule (the 60-minute window and 10-minute tolerance are
   stated). The label is stripped from the position text because the citation chip already
   shows "D1 p.1".
-- `/api/profiles` marks the incident profile available. Statistical stays unavailable until M8.
+- `/api/profiles` marks the incident profile available. Statistical stays unavailable (M8 was
+  skipped, D-069).
 - **Milestone:** M6
 
 ## D-062 Triage: a rule floor that the model may only raise
@@ -1278,9 +1279,10 @@ All tunable values are named constants at the top of `incident_rules.py`.
   extraction found the man walking off (floor P2), but the model proposed no raise for the
   knife, so grounding never ran. Recorded as ASSUMPTIONS L-019. No prompt tuning was done
   (one attempt, per the time-box).
-- Screenshots: `docs/images/m7-triage-badge.png`, `m7-triage-override.png`,
-  `m7-group-priority.png` (real model) and `m7-mock-grounded-raise.png` (mock, T5 raised to P1
-  with a checked quote).
+- Screenshots (real model): `docs/images/m7-triage-badge.png`, `m7-triage-override.png` and
+  `m7-group-priority.png`. A mock screenshot of the model raise was removed in M9 because D-068
+  made it inaccurate; the raise path is covered by tests (`test_model_raise_remains_a_backstop`,
+  `test_grounded_raise_is_accepted`).
 - **Milestone:** M7
 
 ## D-068 Weapon as an extracted fact (rule floor P1)
@@ -1321,9 +1323,104 @@ All tunable values are named constants at the top of `incident_rules.py`.
   20/20 fields, weapon not_mentioned on 4/4, 6/6 planted contradictions, 0 false, grouping
   correct, T4 photo checks 2/2. Both runs took longer than in M7 (174 s for five tickets); the
   machine's state is the likely cause, not the one extra field, but this was not investigated.
-- `docs/images/m7-mock-grounded-raise.png` shows the M7 mock state (T5 raised by the model). In
-  mock mode T5 is now P1 from the rule floor, and the raise is a no-op.
+- In mock mode T5 is now P1 from the rule floor, so the mock's raise is a no-op there.
 - **Milestone:** M7 follow-up
+
+## D-069 M8 skipped
+
+- **What:** the could-have milestone M8 was not built:
+  - **Page previews** (`GET /api/jobs/{id}/documents/{doc}/pages/{n}.png`): not implemented. A
+    citation chip opens the page drawer (D-049), which lists everything the analysis says about
+    that page, but shows no page image. Uploads are still deleted after processing.
+  - **Statistical profile:** listed by `/api/profiles` with `available: false` and shown as
+    "Statistical (coming later)" in the upload panel; uploads with it get 400
+    `UNSUPPORTED_PROFILE`. `StatisticalExtension` is not defined.
+  - **Feedback stats:** already built in M7 (`GET /api/feedback/stats`, D-066).
+- **Why:** time went to the incident profile, triage and the M9 checks, which serve the
+  flagship scenario. The brief does not require previews or a third profile.
+- **Milestone:** M9
+
+## D-070 The flaky test was a PII-masking bug in triage (fixed)
+
+- **Found:** 10 consecutive full backend runs in M9; run 7 failed in
+  `test_frontend_fixtures.py::test_incident_job_fixture`. The diff showed a triage factor's
+  citation `document_id` as `276f5946-[PHONE REDACTED]-ba66-…`.
+- **Cause:** triage masked PII on the whole `Triage` dump, citations included. The D-053
+  boundary rule (no letter or digit on either side) does not protect a UUID whose middle groups
+  are all digits starting with 3, 6, 8 or 9: `-8123-4567-` is bounded by hyphens, and the phone
+  pattern allows a hyphen after four digits. Random UUIDs hit this in roughly 1 job in 10, which
+  is why the failure looked flaky. In production the factor's page chip would have pointed at
+  no document.
+- **Fixes, two layers (as in D-053):**
+  1. Triage masks only its free text (rationale and factor text), never citations.
+  2. `mask_pii` leaves any UUID span untouched, wherever it appears in a string.
+  The other four masking call sites mask model output before document IDs are attached.
+- **Regression tests:** `test_pii.py` (the UUID alone and inside a sentence is untouched, and
+  text around it is still masked) and
+  `test_triage_pipeline.py::test_masking_never_touches_citation_document_ids`. All four were
+  confirmed to fail on the old code.
+- **Verification:** a second loop of 10 full runs after the fix: 10 of 10 passed (401 tests
+  each), partly while the clean-clone Docker build ran alongside.
+- **Milestone:** M9
+
+## D-071 Clean-clone check (M9)
+
+- **What:** `main` cloned from GitHub into an empty folder (Windows 10, Python 3.12.0, Node
+  24.22.3, Docker Desktop 29.2.0), then only documented commands: `scripts/setup_backend.ps1`,
+  backend `pytest` and ruff, the frontend CI commands, both sample generators, the mock compose
+  stack and `scripts/smoke_test.sh`. The backend dev server with the Vite dev server was also
+  checked (proxy to `/api` works).
+- **Passed unchanged:** PowerShell setup; 397 backend tests (no files modified by the run);
+  ruff check and format; `npm ci`, lint, typecheck, 35 frontend tests, build; mock stack up and
+  healthy in 90 s; ticket generator byte-identical (`encrypted.pdf` differs by design).
+- **Failed, and fixed:**
+  1. `scripts/smoke_test.sh` stopped with "Python was not found" on Windows. It chose
+     `python3` because the name exists on PATH, but there it is the Microsoft Store alias,
+     which only prints an install hint. It now takes the first of `$PYTHON`, `python3`,
+     `python` that actually runs. Re-run against the clean-clone stack: passed.
+  2. `scripts/setup_backend.sh` (Git Bash) had the same `python3` default and would stop with
+     "Python 3.12+ is required". It now takes the first candidate that runs and is 3.12+.
+     Re-run in the clean clone: venv created and requirements installed.
+- **Not documented (now in `docs/README_FACTS.md` for the README):** the frontend commands
+  (`npm ci`, `npm run dev`, lint, typecheck, test, build) appeared only in CI and
+  `package.json`.
+- **Windows Vitest failure, pinned down:** "failed to find the current suite" happens when
+  Node's working directory has a lower-case drive letter (`c:\...`), as a Git Bash started
+  by VS Code can pass on. It is not Git Bash as such: the same shell passes after
+  `cd "C:/..."`. Two fixes in `vite.config.ts` (an upper-cased `root`, then an absolute
+  `setupFiles` path) did not help and were reverted. Documented workaround: run frontend tests
+  from PowerShell, or `cd` with an upper-case drive letter first.
+- **Transitive dependencies:** `pymupdf==2.1` itself depends on `pymupdf4llm`,
+  `pymupdf-layout`, `onnxruntime`, `numpy`, `networkx` and a few others. They are installed
+  with it but not imported by this project, and they are why the backend image is 672 MB
+  (D-052). The pin keeps clean installs identical to development.
+- **Not re-run:** the real-model Docker stacks (Docker's Ollama was deliberately not started,
+  A-306; last verified in M5, D-054) and the conda environment.
+- **Milestone:** M9
+
+## D-072 Clean-state timing (M9)
+
+- **Setup:** other GPU-heavy apps closed by the author. Native Ollama, `qwen3-vl:4b-instruct`,
+  flash attention + q8_0 KV cache, 16k context, RTX 3070 8 GB. Desktop VRAM before the model
+  loaded: 1.5 GB (it was about 2.5 GB in M2). One run of each measurement.
+- **GPU residency:** Ollama's `/api/ps` (the data `ollama ps` prints; the CLI was not used on
+  this machine) showed `qwen3-vl:4b-instruct` at 4.42 GB, all of it in VRAM: **100% GPU**,
+  context 16384, both after the benchmark and after the job. Total VRAM in use with the model
+  loaded: 7.1 of 8.2 GB.
+- **`scripts/benchmark_vision.py --runs 3`** (same render, prompt and schema as stage 2):
+
+  | Page | Cold (load included) | Warm median (min–max, n=3) | Warm tokens/s |
+  |---|---|---|---|
+  | Vector chart (general) | 13.6 s | **2.5 s** (2.4–3.9) | 50–82 |
+  | Real photo (incident) | 10.9 s | **4.5 s** (4.4–4.6) | 75–79 |
+
+  In line with D-023 (2.9 s and 3.9 s). The photo now produces more output tokens (345 against
+  180–310 in M2), because the incident scene fields were added in M6.
+- **Five sample tickets, incident profile, with triage, upload to completed: 117 s.** The same
+  job took 174 s in M7 and 440 s in the D-068 re-run with other GPU apps open, so the slow runs
+  were GPU contention, not the pipeline. Results were identical to D-068: T1 P3, T2 P2, T3 P2,
+  T4 P3, T5 P1 by rule; group T1–T3 P2.
+- **Milestone:** M9
 
 ---
 

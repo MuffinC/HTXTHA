@@ -128,3 +128,27 @@ async def test_triage_prompt_carries_the_rubric_and_the_floor(settings: Settings
     assert "P1: Ongoing danger to life, serious injury or death, weapons" in request.prompt
     assert "RULE-BASED FLOOR" in request.prompt and "P2. Factors: Injury reported" in request.prompt
     assert "<<<UNTRUSTED_CONTENT_BEGIN id=" in request.prompt
+
+
+async def test_masking_never_touches_citation_document_ids(settings: Settings) -> None:
+    # Regression (D-070): this UUID's middle groups look like "8123-4567", a phone number.
+    data = ticket_pdf(replace(T2, narrative=[*T2.narrative, "Call me on 9123 4567."]))
+    extracted = extract_document(data, settings)
+    doc_id = "276f5946-8123-4567-ba66-ca50c54928dc"
+    provider = RecordingProvider(
+        {LLMTask.TRIAGE: [_triage_reply("P1", ("Call me on 9123 4567.", 1))]}
+    )
+    analysis = await analyse_document(
+        document_id=doc_id,
+        filename="t2.pdf",
+        extracted=extracted,
+        visual_elements=[],
+        warnings=list(extracted.warnings),
+        profile="incident",
+        provider=provider,
+        settings=settings,
+    )
+    triage = analysis.triage
+    assert {f.citation.document_id for f in triage.triggering_factors} == {doc_id}
+    model_factor = next(f for f in triage.triggering_factors if f.source == "model")
+    assert "9123 4567" not in model_factor.factor and "[PHONE REDACTED]" in model_factor.factor

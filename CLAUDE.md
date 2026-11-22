@@ -418,15 +418,15 @@ Mock mode must work with **no Ollama at all**, e.g. via a compose profile or `do
 
 **After each milestone: stop, summarise what changed, explain how to verify it manually, confirm tests pass, and update DECISIONS.md / ASSUMPTIONS.md. Wait for the author's go-ahead before starting the next milestone.**
 
-| # | Milestone | Priority |
-|---|---|---|
-| M0 | Scaffold repo layout, `.gitignore`, empty FastAPI app with `/api/health`, Vite React app, docs files | Must |
-| M1 | Validation + security checks + extraction (no LLM), with tests and adversarial fixtures | Must |
-| M2 | LLM provider interface, mock provider, Ollama provider, visual analysis stage | Must |
-| M3 | Document analysis (General profile), consolidated report, async job queue, SQLite, full API, logging | Must |
-| M4 | Frontend: upload, progress, results, all states | Must |
-| M5 | Dockerfiles, compose (normal, mock, GPU), CI workflow green | Must |
-| M6 | Incident profile + sample ticket generator | Should |
-| M7 | Triage + analyst override + feedback capture | Should |
-| M8 | Page previews, statistical profile, feedback stats | Could |
-| M9 | Polish, clean-clone test run, final docs pass | Must |
+| # | Milestone | Priority | Status |
+|---|---|---|---|
+| M0 | Scaffold repo layout, `.gitignore`, empty FastAPI app with `/api/health`, Vite React app, docs files | Must | Done |
+| M1 | Validation + security checks + extraction (no LLM), with tests and adversarial fixtures | Must | Done |
+| M2 | LLM provider interface, mock provider, Ollama provider, visual analysis stage | Must | Done |
+| M3 | Document analysis (General profile), consolidated report, async job queue, SQLite, full API, logging | Must | Done |
+| M4 | Frontend: upload, progress, results, all states | Must | Done |
+| M5 | Dockerfiles, compose (normal, mock, GPU), CI workflow green | Must | Done |
+| M6 | Incident profile + sample ticket generator | Should | Done |
+| M7 | Triage + analyst override + feedback capture | Should | Done (plus weapon fact, D-068) |
+| M8 | Page previews, statistical profile, feedback stats | Could | Skipped (D-069). Feedback stats was built in M7; statistical is listed as "coming later" |
+| M9 | Polish, clean-clone test run, final docs pass | Must | Done |

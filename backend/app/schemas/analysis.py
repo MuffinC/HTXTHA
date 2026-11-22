@@ -70,8 +70,9 @@ class ChunkNotes(BaseModel):
 class DocumentAnalysis(BaseModel):
     """Per-document result (CLAUDE.md section 8).
 
-    ``incident`` is set for the incident profile (M6). ``statistical`` and
-    ``triage`` arrive with the statistical profile (M8) and triage (M7).
+    ``incident`` and ``triage`` are set for the incident profile only.
+    The spec's ``statistical`` field is not defined: that profile was not built
+    (DECISIONS D-069).
     """
 
     document_id: str
