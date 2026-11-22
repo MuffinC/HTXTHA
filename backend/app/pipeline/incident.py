@@ -81,7 +81,7 @@ async def extract_incident(
     grounded, downgraded = rules.ground_facts(extraction.facts)
     if downgraded:
         logger.info(
-            "Ungrounded incident facts downgraded to not_mentioned",
+            "Incident facts downgraded (ungrounded) or corrected (weapon negation)",
             extra={"stage": "analysing", "event": "facts_ungrounded", "count": len(downgraded)},
         )
         extraction = extraction.model_copy(update={"facts": grounded})

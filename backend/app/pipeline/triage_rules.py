@@ -25,6 +25,7 @@ not fixed fields; only a grounded model raise can bring them in.
 import re
 from dataclasses import dataclass
 
+from app.pipeline.incident_rules import is_negated_weapon_mention
 from app.schemas.common import Citation
 from app.schemas.consolidated import Contradiction
 from app.schemas.incident import IncidentExtension
@@ -32,6 +33,7 @@ from app.schemas.triage import PRIORITY_ORDER, Priority, TriageFactor, TriageMod
 
 #: Contradiction topics (incident_rules.FIELD_LABELS) that lift a group to P2.
 SAFETY_TOPICS: tuple[str, ...] = (
+    "Weapon",
     "Traffic light",
     "Injuries",
     "A party left the scene",
@@ -65,6 +67,8 @@ def rule_floor(incident: IncidentExtension, document_id: str) -> RuleResult:
     def cite(page: int | None) -> Citation:
         return Citation(document_id=document_id, page=page or 1)
 
+    if facts.weapon.value == "yes":
+        candidates.append(("P1", "Weapon reported", facts.weapon.page))
     if facts.injuries.value == "serious_or_fatal":
         candidates.append(("P1", "Serious injury or death reported", facts.injuries.page))
     elif facts.injuries.value == "injury":
@@ -125,6 +129,8 @@ def ground_escalation(
     A proposal at or below the floor is not a raise and changes nothing. A raise
     with no quote that actually appears on its page (normalised for whitespace
     and case) is ignored; injected text cannot conjure evidence that is not there.
+    A quote that names a weapon only to deny it ("no weapon was seen") is not
+    evidence either (DECISIONS D-068).
     """
     if not is_raise(proposal.proposed_priority, floor):
         return Escalation(False, None, [], "Model did not propose a higher priority.")
@@ -132,7 +138,7 @@ def ground_escalation(
     for ev in proposal.evidence:
         quote = _normalise(ev.quote)
         page_text = _normalise(page_texts.get(ev.page, ""))
-        if len(quote) >= 4 and quote in page_text:
+        if len(quote) >= 4 and quote in page_text and not is_negated_weapon_mention(quote):
             grounded.append(
                 TriageFactor(
                     factor=f"{proposal.reason} (“{ev.quote.strip()}”)",
@@ -145,8 +151,8 @@ def ground_escalation(
             False,
             None,
             [],
-            f"Model proposed {proposal.proposed_priority} but no quote was found on the cited "
-            "page; the raise was ignored.",
+            f"Model proposed {proposal.proposed_priority} but no supporting quote was found on "
+            "the cited page; the raise was ignored.",
         )
     return Escalation(True, proposal.proposed_priority, grounded, "")
 

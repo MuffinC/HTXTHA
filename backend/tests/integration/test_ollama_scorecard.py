@@ -193,6 +193,17 @@ def score_tickets(job: dict[str, Any]) -> list[str]:
                 misses.append(f"{ticket.key}.{name}: {actual} (expected {expected})")
     lines.append(f"field extraction: {correct}/{total} correct")
     lines += [f"  wrong: {m}" for m in misses]
+    # Reported separately so the 20-field measure stays comparable with M6 (D-068):
+    # none of the four tickets mentions a weapon.
+    weapon = {
+        t.key: (by_key[t.key]["analysis"]["incident"] or {}).get("facts", {}).get("weapon", {})
+        for t in TICKETS
+    }
+    weapon_ok = sum(w.get("value") == "not_mentioned" for w in weapon.values())
+    lines.append(
+        f"weapon (expected not_mentioned on all 4): {weapon_ok}/4 "
+        f"{ {k: w.get('value') for k, w in weapon.items()} }"
+    )
 
     report = job["consolidated"]
     groups = [{key_by_id[i] for i in g["document_ids"]} for g in report["related_document_groups"]]

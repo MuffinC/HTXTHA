@@ -24,6 +24,7 @@ def incident(
         "lighting",
         "injuries",
         "party_left_scene",
+        "weapon",
     )
     fact_data: dict[str, Any] = {n: {"value": "not_mentioned"} for n in names}
     for name, value in facts.items():
@@ -75,6 +76,8 @@ def proposal(priority: str, *evidence: tuple[str, int]) -> TriageModelOutput:
     ("facts", "expected"),
     [
         ({"injuries": "serious_or_fatal"}, "P1"),
+        ({"weapon": "yes", "injuries": "none"}, "P1"),
+        ({"weapon": "no", "injuries": "none"}, "P3"),
         ({"injuries": "injury"}, "P2"),
         ({"party_left_scene": "yes", "injuries": "none"}, "P2"),
         ({"injuries": "none"}, "P3"),
@@ -162,7 +165,7 @@ def test_group_is_the_highest_of_its_reports() -> None:
 
 
 @pytest.mark.parametrize(
-    "topic", ["Traffic light", "Injuries", "A party left the scene", "Number of vehicles"]
+    "topic", ["Weapon", "Traffic light", "Injuries", "A party left the scene", "Number of vehicles"]
 )
 def test_safety_contradictions_lift_the_group_to_p2(topic: str) -> None:
     result = t.group_priority({"a": "P3", "b": "P3"}, [_contradiction(topic)])
@@ -182,3 +185,19 @@ def test_lift_never_lowers_a_more_urgent_group() -> None:
         {"a": "P1", "b": "P3"}, [_contradiction("Traffic light (incident 1)")]
     )
     assert result.priority == "P1"
+
+
+def test_weapon_gives_p1_citing_the_quote_page() -> None:
+    data = incident(weapon="yes", party_left_scene="yes")
+    data.facts.weapon = data.facts.weapon.model_copy(update={"page": 2})
+    result = t.rule_floor(data, DOC)
+    assert result.priority == "P1"
+    weapon = next(f for f in result.factors if f.factor == "Weapon reported")
+    assert weapon.citation.page == 2 and weapon.source == "rule"
+
+
+def test_negated_weapon_quote_is_not_evidence_for_a_raise() -> None:
+    page = "Two men were shouting. No weapon was seen. Nobody was hurt."
+    result = t.ground_escalation(proposal("P1", ("No weapon was seen.", 1)), "P3", {1: page}, DOC)
+    assert result.accepted is False
+    assert "ignored" in result.note

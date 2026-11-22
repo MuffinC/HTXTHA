@@ -23,6 +23,7 @@ import re
 from typing import Any
 
 from app.llm.base import LLMProvider, LLMRequest, LLMResult, LLMTask
+from app.pipeline.incident_rules import is_negated_weapon_mention
 
 #: Text that makes the mock fail a document's analysis (demo/test aid, mock only).
 MOCK_FAIL = "MOCK_FAIL"
@@ -302,6 +303,20 @@ def _incident_output(metadata: dict[str, Any]) -> dict[str, Any]:
             _find(narrative, r"\b(?:drove|rode|sped) off\b|\bleft the scene\b", "yes"),
             _find(narrative, r"\b(?:both|all) (?:drivers|parties) stayed\b", "no"),
         ),
+        # Negated mentions first, so "no weapon was seen" is no (like the real prompt asks).
+        "weapon": first(
+            _find(
+                narrative,
+                r"\b(?:no|not|without|unarmed)\b[^.]*\b(?:weapons?|knife|knives|guns?)\b"
+                r"|\bunarmed\b",
+                "no",
+            ),
+            _find(
+                narrative,
+                r"\b(?:weapons?|knife|knives|guns?|firearm|blade|parang|machete)\b",
+                "yes",
+            ),
+        ),
         "vehicle_types": sorted(
             {
                 t
@@ -336,7 +351,9 @@ def _incident_output(metadata: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------- triage
 # The mock raises only when a page mentions a weapon (the demo keyword), quoting
 # the sentence verbatim so the real grounding check accepts it. Otherwise it
-# proposes the rule floor, so the rule-based priorities show unchanged.
+# proposes the rule floor. Since D-068 a weapon is usually caught by the rule
+# floor (weapon fact = yes -> P1), so this raise is a backstop that changes
+# nothing when the extraction already found the weapon.
 _WEAPON = re.compile(r"\b(knife|knives|weapon|gun|parang|machete)\b", re.IGNORECASE)
 
 
@@ -344,7 +361,7 @@ def _triage_output(metadata: dict[str, Any]) -> dict[str, Any]:
     floor = metadata.get("rule_floor", "P4")
     for page, text in metadata.get("page_texts", {}).items():
         for line in text.splitlines():
-            if _WEAPON.search(line):
+            if _WEAPON.search(line) and not is_negated_weapon_mention(line):
                 return {
                     "proposed_priority": "P1",
                     "reason": "[MOCK] A weapon is mentioned",

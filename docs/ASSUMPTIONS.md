@@ -227,14 +227,20 @@ Assumptions made while building, grouped by area. Code-level assumptions are mar
   `INJECTION_SUSPECTED` when the scanner recognises the phrasing, every triage result requires
   human review, and the model's factors are labelled "AI, quote checked" so the analyst can
   open the cited page.
-- L-017: Grounding checks that the quote is on the page, not that it supports the claim. A
-  verbatim "no weapon was involved" would ground a weapon raise. The analyst sees the quote
-  and the page chip; a stricter check (negation detection) was left out as unreliable.
-- L-019: In the one live run, the 4B model did **not** raise the knife ticket (T5) to P1: it
-  stayed at the rule floor, P2. The rubric's weapon condition therefore depends on the model,
-  and the model missed it. The safe failure mode holds (the priority was not lowered, and the
-  analyst still reviews it), but a weapon can be under-prioritised. A likely fix is to make
-  "weapon mentioned" an extracted, quote-grounded fact so code applies P1 directly, as for
-  injuries. That was not done in M7.
+- L-017: Grounding checks that the quote is on the page, not that it fully supports the claim.
+  **Partly mitigated (D-068):** a quote that names a weapon only to deny it ("no weapon was
+  involved") is no longer accepted as raise evidence. Other unsupportive quotes can still
+  ground a raise; the analyst sees the quote and the page chip.
+- L-019: In the M7 live run, the 4B model did not raise the knife ticket (T5) to P1; it
+  stayed at the rule floor, P2. **Addressed (D-068):** weapon is now an extracted,
+  quote-grounded fact, and weapon = yes gives a P1 rule floor. In the live re-run, T5 came out P1 from the rule floor, with the
+  model proposing no raise. The model-raise
+  path remains as a backstop for conditions without a field (a suspect at large, ongoing
+  danger) and for a weapon the extraction misses. As observed, it rarely fires on the 4B
+  model.
+- L-020: The weapon negation check (D-068) is a word list over a short quote. Double negatives
+  ("I can't say he didn't have a knife") or a negation about something else in the same quote
+  ("The knife was not his") can flip the value wrongly. The second case errs towards no; the
+  analyst sees the quote either way.
 - L-018: The mock provider's triage raise is a weapon keyword match. It demonstrates the
   grounding path on the sample tickets but says nothing about real model quality.

@@ -149,6 +149,11 @@ const fixture: JobResponse = {
               "as_written": "Nobody appeared to be hurt and both drivers stayed to exchange details.",
               "page": 1
             },
+            "weapon": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
             "vehicle_types": [
               "car"
             ],
@@ -334,6 +339,11 @@ const fixture: JobResponse = {
               "as_written": "The silver car drove off before the police arrived.",
               "page": 1
             },
+            "weapon": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
             "vehicle_types": [
               "car",
               "motorcycle",
@@ -502,6 +512,11 @@ const fixture: JobResponse = {
               "page": 1
             },
             "party_left_scene": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
+            "weapon": {
               "value": "not_mentioned",
               "as_written": null,
               "page": null
@@ -731,6 +746,11 @@ const fixture: JobResponse = {
               "as_written": null,
               "page": null
             },
+            "weapon": {
+              "value": "not_mentioned",
+              "as_written": null,
+              "page": null
+            },
             "vehicle_types": [
               "car"
             ],
@@ -839,6 +859,12 @@ const fixture: JobResponse = {
               "page": 1,
               "corroboration": "not_verifiable",
               "note": "No photo attached."
+            },
+            {
+              "claim": "Weapon: yes (“One of them was holding a knife and waving it at the other man.”)",
+              "page": 1,
+              "corroboration": "not_verifiable",
+              "note": "No photo attached."
             }
           ],
           "consistency_checks": [],
@@ -881,6 +907,11 @@ const fixture: JobResponse = {
               "as_written": null,
               "page": null
             },
+            "weapon": {
+              "value": "yes",
+              "as_written": "One of them was holding a knife and waving it at the other man.",
+              "page": 1
+            },
             "vehicle_types": [
               "bus"
             ],
@@ -903,30 +934,22 @@ const fixture: JobResponse = {
         },
         "triage": {
           "suggested_priority": "P1",
-          "rationale": "Rule floor P3: No injuries reported. Raised to P1 by the model, with quoted evidence.",
+          "rationale": "Rule floor P1: Weapon reported.",
           "triggering_factors": [
             {
-              "factor": "No injuries reported",
+              "factor": "Weapon reported",
               "citation": {
                 "document_id": "00000000-0000-4000-8000-000000000006",
                 "page": 1
               },
               "source": "rule"
-            },
-            {
-              "factor": "[MOCK] A weapon is mentioned (“One of them was holding a knife and waving it at the other man.”)",
-              "citation": {
-                "document_id": "00000000-0000-4000-8000-000000000006",
-                "page": 1
-              },
-              "source": "model"
             }
           ],
-          "confidence": "medium",
+          "confidence": "high",
           "requires_human_review": true,
           "analyst_override": null,
-          "rule_priority": "P3",
-          "model_priority": "P1"
+          "rule_priority": "P1",
+          "model_priority": null
         }
       }
     }

@@ -42,17 +42,40 @@ def _triage_reply(priority: str, *evidence: tuple[str, int]) -> str:
     )
 
 
-async def test_weapon_is_raised_to_p1_with_a_grounded_quote(settings: Settings) -> None:
-    analysis = await _analyse(
-        WEAPON_TICKET, RecordingProvider(), settings
-    )  # mock raises on "knife"
+async def test_weapon_is_p1_from_the_rule_floor(settings: Settings) -> None:
+    analysis = await _analyse(WEAPON_TICKET, RecordingProvider(), settings)
+    weapon = analysis.incident.facts.weapon
+    assert weapon.value == "yes" and "knife" in weapon.as_written and weapon.page == 1
     triage = analysis.triage
-    assert triage.suggested_priority == "P1"
-    assert triage.rule_priority in {"P2", "P3"}
-    assert triage.model_priority == "P1"
-    model_factors = [f for f in triage.triggering_factors if f.source == "model"]
-    assert model_factors and "knife" in model_factors[0].factor
+    assert triage.suggested_priority == triage.rule_priority == "P1"
+    assert triage.model_priority is None  # nothing left for the model to raise
+    factor = next(f for f in triage.triggering_factors if f.factor == "Weapon reported")
+    assert factor.source == "rule" and factor.citation.page == 1
     assert triage.requires_human_review is True
+
+
+async def test_negated_weapon_is_no_and_does_not_give_p1(settings: Settings) -> None:
+    unarmed = replace(
+        WEAPON_TICKET,
+        key="t5_unarmed",
+        narrative=[
+            "Two men were shouting at each other outside the coffee shop.",
+            "No weapon of any kind was seen. Nobody was hurt as far as I could see.",
+        ],
+    )
+    analysis = await _analyse(unarmed, RecordingProvider(), settings)
+    assert analysis.incident.facts.weapon.value == "no"
+    assert analysis.triage.suggested_priority == "P3"
+
+
+async def test_model_raise_remains_a_backstop(settings: Settings) -> None:
+    # If extraction misses a condition, a grounded raise still lifts the priority.
+    provider = RecordingProvider(
+        {LLMTask.TRIAGE: [_triage_reply("P1", ("hit a roadside tree", 1))]}
+    )
+    analysis = await _analyse(T4, provider, settings)
+    assert analysis.triage.rule_priority == "P3"
+    assert analysis.triage.suggested_priority == analysis.triage.model_priority == "P1"
 
 
 async def test_ungrounded_weapon_claim_is_ignored(settings: Settings) -> None:

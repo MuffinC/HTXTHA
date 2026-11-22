@@ -60,6 +60,7 @@ FactField = Literal[
     "lighting",
     "injuries",
     "party_left_scene",
+    "weapon",
 ]
 
 FIELD_LABELS: dict[str, str] = {
@@ -71,6 +72,7 @@ FIELD_LABELS: dict[str, str] = {
     "lighting": "Lighting",
     "injuries": "Injuries",
     "party_left_scene": "A party left the scene",
+    "weapon": "Weapon",
 }
 
 VALUE_LABELS: dict[str, str] = {
@@ -94,6 +96,7 @@ COMPARED_FIELDS: tuple[FactField, ...] = (
     "lighting",
     "injuries",
     "party_left_scene",
+    "weapon",
 )
 
 
@@ -917,14 +920,53 @@ GROUNDING_CUES: dict[str, tuple[str, ...]] = {
         "scene",
     ),
 }
+# Weapon cues are matched as whole words: substrings would let "gun" match "begun" and
+# "armed" match "alarmed". The quote must contain one of these for any weapon value.
+_WEAPON_CUE = re.compile(
+    r"\b(?:weapons?|knife|knives|guns?|firearms?|pistols?|rifles?|shotguns?|revolvers?|"
+    r"blades?|parangs?|machetes?|swords?|axes?|cleavers?|daggers?|armed|unarmed|"
+    r"stabb?(?:ed|ing)?|shot (?:at|him|her|someone))\b",
+    re.I,
+)
+# Negation anywhere in the (short) quote. Crude on purpose; see ASSUMPTIONS L-020.
+_NEGATION = re.compile(
+    r"\b(?:no|not|never|without|nobody|none|neither|nor|unarmed|"
+    r"didn'?t|did not|wasn'?t|was not|weren'?t|were not|couldn'?t|could not)\b|\bno one\b",
+    re.I,
+)
+
+
+def is_negated_weapon_mention(quote: str) -> bool:
+    """True for a quote that names a weapon only to deny it ("no weapon was seen")."""
+    return bool(_WEAPON_CUE.search(quote)) and bool(_NEGATION.search(quote))
+
+
+def weapon_polarity(value: str, quote: str) -> str:
+    """Check a grounded weapon value against negation in its quote (safety-first).
+
+    "No weapon was seen" labelled yes becomes no. A weapon quote without any negation
+    labelled no ("he was holding a knife") becomes yes, because under-reading a weapon
+    is the costly error; every result is reviewed by an analyst.
+    """
+    negated = bool(_NEGATION.search(quote))
+    if value == "yes" and negated:
+        return "no"
+    if value == "no" and not negated:
+        return "yes"
+    return value
+
+
 _NOT_A_QUOTE = re.compile(r"^\W*(?:not (?:mentioned|stated)|n/?a|none|unknown|null)\W*$", re.I)
 
 
 def ground_facts(facts: IncidentFacts) -> tuple[IncidentFacts, list[str]]:
     """Downgrade stated values whose quote does not support them to "not_mentioned".
 
+    The weapon fact is also checked for negation (``weapon_polarity``).
+
     Returns:
-        The grounded facts and the names of the fields that were downgraded.
+        The grounded facts and the names of the fields that were changed: a plain
+        name means downgraded to not_mentioned, ``weapon:polarity`` means corrected.
     """
     downgraded: list[str] = []
     updated = facts.model_copy()
@@ -935,8 +977,16 @@ def ground_facts(facts: IncidentFacts) -> tuple[IncidentFacts, list[str]]:
         quote = (fact.as_written or "").strip()
         cues = GROUNDING_CUES.get(name, ())
         grounded = bool(quote) and not _NOT_A_QUOTE.match(quote)
-        if grounded and cues:
+        if grounded and name == "weapon":
+            grounded = bool(_WEAPON_CUE.search(quote))
+        elif grounded and cues:
             grounded = any(cue in quote.lower() for cue in cues)
+        if grounded and name == "weapon":
+            corrected = weapon_polarity(fact.value, quote)
+            if corrected != fact.value:
+                setattr(updated, name, fact.model_copy(update={"value": corrected}))
+                downgraded.append(f"{name}:polarity")
+            continue
         if not grounded:
             setattr(
                 updated,

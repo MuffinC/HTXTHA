@@ -19,6 +19,7 @@ Ticket fields (copy them exactly as written, or null if absent):
 - lighting: daylight, dusk_or_dawn, night_street_lit or night_dark, only if the reporter describes the light ("street lights were on", "very dark"). Do not work it out from the time.
 - injuries: none ("nobody was hurt"), injury (anyone hurt, holding an arm, bleeding), serious_or_fatal, or not_mentioned.
 - party_left_scene: yes if the reporter says someone drove, rode or walked away from the scene, otherwise no or not_mentioned.
+- weapon: yes if the reporter says anyone had, showed or used a weapon (a knife, gun, blade, parang or any object used as a weapon); no only if the reporter says there was no weapon ("no weapon was seen", "he was unarmed"); otherwise not_mentioned. Read negation carefully: "no weapon was seen" is no, never yes. Quote the words that mention the weapon.
 - vehicle_types and damage_locations: lists, only as stated.
 
 Also:

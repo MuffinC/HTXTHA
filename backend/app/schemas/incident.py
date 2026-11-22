@@ -109,6 +109,10 @@ class LeftSceneFact(Stated[Literal["yes", "no", "not_mentioned"]]):
     pass
 
 
+class WeaponFact(Stated[Literal["yes", "no", "not_mentioned"]]):
+    pass
+
+
 class IncidentFacts(BaseModel):
     """Facts from the reporter's account. "not_mentioned" when the reporter does not say."""
 
@@ -119,6 +123,8 @@ class IncidentFacts(BaseModel):
     lighting: LightingFact
     injuries: InjuriesFact
     party_left_scene: LeftSceneFact
+    #: Rubric P1 condition (DECISIONS D-068). Polarity is checked by code after grounding.
+    weapon: WeaponFact
     vehicle_types: list[VehicleType] = Field(default_factory=list, max_length=LIST_MAX)
     damage_locations: list[DamageLocation] = Field(default_factory=list, max_length=LIST_MAX)
 

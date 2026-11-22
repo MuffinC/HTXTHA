@@ -146,9 +146,8 @@ T4 = Ticket(
 
 TICKETS: list[Ticket] = [T1, T2, T3, T4]
 
-#: Triage demo (M7), kept out of TICKETS so the M6 scorecard set is unchanged. The
-#: fixed fields give at most P2 (a party walked off); the knife is only in the text,
-#: so only a grounded model raise can take it to P1.
+#: Triage demo (M7), kept out of TICKETS so the M6 scorecard set is unchanged. Since
+#: D-068 the knife is an extracted, quote-grounded weapon fact, so the rule floor is P1.
 WEAPON_TICKET = Ticket(
     key="t5_weapon_variant",
     reference="CW-24-1005",
@@ -165,7 +164,7 @@ WEAPON_TICKET = Ticket(
         "Nobody was hurt as far as I could see. The man with the knife walked off towards the "
         "bus interchange.",
     ],
-    expected={"injuries": "none"},
+    expected={"injuries": "none", "weapon": "yes"},
 )
 
 #: What the rules should find with a perfect extraction (used by tests and the scorecard).

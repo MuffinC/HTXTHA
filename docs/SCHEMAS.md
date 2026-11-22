@@ -191,7 +191,7 @@ after one retry), `LLM_TIMEOUT`, `LLM_UNAVAILABLE`, `LLM_REFUSED`, `INTERNAL_ERR
 | `claims` | `{claim, page, corroboration: supported \| contradicted \| not_verifiable, note}[]` | code |
 | `consistency_checks` | `{check, result: consistent \| inconsistent \| unclear, details, pages}[]` | code |
 | `missing_information` | `string[]` | code plus model |
-| `facts` (**addition**) | `IncidentFacts`: `traffic_light`, `vehicle_count`, `weather`, `road_surface`, `lighting`, `injuries`, `party_left_scene` as `{value, as_written, page}` (value from a closed list, or `not_mentioned`), plus `vehicle_types[]`, `damage_locations[]` | model, then quote-grounded by code |
+| `facts` (**addition**) | `IncidentFacts`: `traffic_light`, `vehicle_count`, `weather`, `road_surface`, `lighting`, `injuries`, `party_left_scene`, `weapon` (D-068) as `{value, as_written, page}` (value from a closed list, or `not_mentioned`), plus `vehicle_types[]`, `damage_locations[]` | model, then quote-grounded by code |
 | `derived` (**addition**) | `{incident_date, incident_time, expected_lighting}`, each `{value, source} \| null` | code |
 
 `VisualElement.scene: SceneObservation | null` (**addition**; incident photos only):

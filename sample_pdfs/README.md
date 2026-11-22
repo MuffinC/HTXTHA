@@ -36,8 +36,8 @@ Expected results (`ticket_factory.PLANTED`):
   T4 P3. The T1–T3 group is P2: its highest report is P2, and its contradictions on safety
   fields (traffic light, injuries, a party leaving, vehicle count) need follow-up; the time
   and weather differences are listed but do not lift it. T5 is kept out of the four-ticket set:
-  its fixed fields give at most P2, and the knife appears only in the narrative, so it reaches
-  P1 only through a model raise whose quote is checked against the page text.
+  its knife is extracted as the weapon fact (quote checked on the page), which gives a P1 rule
+  floor (DECISIONS D-068).
 
 ### `tickets/assets/` — images used in the tickets
 

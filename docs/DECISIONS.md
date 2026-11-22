@@ -1216,7 +1216,7 @@ All tunable values are named constants at the top of `incident_rules.py`.
   - the **highest** priority among its reports, and
   - a lift to at least **P2** ("major contradictions needing follow-up") when the reports
     contradict each other on a **safety-relevant** field: traffic light, injuries, a party
-    leaving the scene, or vehicle count.
+    leaving the scene, or vehicle count (and, since D-068, weapon).
   - Contradictions on time, weather, lighting and road surface are listed in the reason as
     "(does not lift)".
 - The lift applies at **group level only**: each report keeps the priority from its own facts
@@ -1282,6 +1282,48 @@ All tunable values are named constants at the top of `incident_rules.py`.
   `m7-group-priority.png` (real model) and `m7-mock-grounded-raise.png` (mock, T5 raised to P1
   with a checked quote).
 - **Milestone:** M7
+
+## D-068 Weapon as an extracted fact (rule floor P1)
+
+- **What:** `IncidentFacts.weapon` (`yes | no | not_mentioned`, with `as_written` and `page`),
+  built like the injuries fact:
+  - **Extraction:** the prompt asks for yes when anyone had, showed or used a weapon, no only
+    when the reporter says there was none, and stresses negation ("no weapon was seen" is no).
+  - **Grounding:** the quote must contain a weapon word, matched as a **whole word** (weapon,
+    knife, gun, firearm, pistol, rifle, blade, parang, machete, sword, axe, cleaver, dagger,
+    armed, unarmed, stabbed…). The other facts use substring cues, but here substrings would
+    let "gun" match "begun" and "armed" match "alarmed". A quote without a weapon word is
+    downgraded to not_mentioned.
+  - **Negation check (code backstop):** after grounding, `weapon_polarity` compares the value
+    with negation words in the quote. A negated quote labelled yes ("No weapon was seen")
+    becomes no. A weapon quote with no negation labelled no ("He was holding a knife")
+    becomes yes. The second correction is safety-first, in the same spirit as L-016:
+    under-reading a weapon is the costly error, and the analyst reviews every result.
+    Corrections are counted in the existing `facts_ungrounded` log event (metadata only).
+  - **Triage:** weapon yes gives a **P1 rule floor**, factor "Weapon reported", citing the
+    quote's page.
+  - **Comparison:** weapon is a compared field (claims, contradictions, agreements). "Weapon"
+    is a safety topic, so a disagreement between reports lifts the group to at least P2
+    (D-064).
+  - **Raise grounding:** a model-raise quote that names a weapon only to deny it ("no weapon
+    was seen") no longer counts as evidence (`is_negated_weapon_mention`). Found while testing:
+    the mock's raise quoted exactly that sentence and grounding accepted it (L-017).
+- **Why:** in the M7 live run the 4B model did not raise the knife ticket (L-019). The rubric's
+  weapon condition is a fixed, quotable fact, like injuries, so code can apply it.
+- The model-raise path stays as a **backstop** for conditions without a field (a suspect at
+  large, ongoing danger) and for a weapon the extraction misses.
+- **Ticket scorecard:** weapon is reported on its own line, so the 20-field measure stays
+  comparable with M6.
+- **Live check (one run each):** five tickets, native Ollama,
+  qwen3-vl:4b-instruct, 440 s. T5 is **P1 from the rule floor** (weapon = yes, quote on page 1,
+  factor "Weapon reported"); the model proposed no raise. T1 P3, T2 P2, T3 P2, T4 P3 and group
+  T1–T3 P2 are unchanged from M7. The ticket scorecard (four tickets, 416 s) was unchanged too:
+  20/20 fields, weapon not_mentioned on 4/4, 6/6 planted contradictions, 0 false, grouping
+  correct, T4 photo checks 2/2. Both runs took longer than in M7 (174 s for five tickets); the
+  machine's state is the likely cause, not the one extra field, but this was not investigated.
+- `docs/images/m7-mock-grounded-raise.png` shows the M7 mock state (T5 raised by the model). In
+  mock mode T5 is now P1 from the rule floor, and the raise is a no-op.
+- **Milestone:** M7 follow-up
 
 ---
 

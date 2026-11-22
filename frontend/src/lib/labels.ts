@@ -130,6 +130,7 @@ export const FACT_FIELDS: { field: FactField; label: string }[] = [
   { field: 'lighting', label: 'Lighting' },
   { field: 'injuries', label: 'Injuries' },
   { field: 'party_left_scene', label: 'A party left the scene' },
+  { field: 'weapon', label: 'Weapon' },
 ];
 
 const VALUE_LABEL: Record<string, string> = {

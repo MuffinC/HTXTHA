@@ -23,6 +23,7 @@ def facts(**overrides: Any) -> IncidentFacts:
             "lighting",
             "injuries",
             "party_left_scene",
+            "weapon",
         )
     }
     for name, value in overrides.items():
@@ -436,6 +437,10 @@ def _stated(name: str, value: str, quote: str | None) -> IncidentFacts:
         ("lighting", "night_dark", "not mentioned"),  # a value with no real quote
         ("traffic_light", "green", None),
         ("injuries", "injury", "   "),
+        # Weapon quotes must contain a weapon word (whole word, not a substring).
+        ("weapon", "yes", "The man walked off towards the bus interchange"),
+        ("weapon", "yes", "The argument had begun outside"),  # "gun" inside "begun"
+        ("weapon", "no", "Everyone was alarmed"),  # "armed" inside "alarmed"
     ],
 )
 def test_ungrounded_values_are_downgraded(name: str, value: str, quote: str | None) -> None:
@@ -455,6 +460,11 @@ def test_ungrounded_values_are_downgraded(name: str, value: str, quote: str | No
         ("injuries", "injury", "My driver hurt his wrist."),
         ("party_left_scene", "yes", "The silver car drove off"),
         ("vehicle_count", "3", "a silver car hit my taxi, and a motorcycle"),  # no cue list
+        ("weapon", "yes", "One of them was holding a knife and waving it at the other man."),
+        ("weapon", "yes", "He pulled out a parang"),
+        ("weapon", "no", "No weapon was seen."),
+        ("weapon", "no", "He was unarmed."),
+        ("weapon", "no", "I did not see a knife or anything like that"),
     ],
 )
 def test_grounded_values_are_kept(name: str, value: str, quote: str) -> None:
@@ -497,3 +507,37 @@ def test_grouping_summary_other_shapes() -> None:
     assert r.grouping_summary(apart, compared=2, excluded=1).endswith(
         "1 report could not be compared."
     )
+
+
+# --------------------------------------------------------------------------- weapon negation
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "No weapon was seen.",
+        "Nobody had a weapon.",
+        "He was unarmed.",
+        "I didn't see a knife.",
+        "There was no knife, just shouting.",
+    ],
+)
+def test_negated_weapon_quote_labelled_yes_is_corrected_to_no(quote: str) -> None:
+    grounded, changed = r.ground_facts(_stated("weapon", "yes", quote))
+    assert grounded.weapon.value == "no"
+    assert grounded.weapon.as_written == quote  # the quote and page are kept
+    assert changed == ["weapon:polarity"]
+
+
+def test_weapon_quote_without_negation_labelled_no_is_corrected_to_yes() -> None:
+    # Safety-first: under-reading a weapon is the costly error (DECISIONS D-068).
+    grounded, changed = r.ground_facts(_stated("weapon", "no", "He was holding a knife."))
+    assert grounded.weapon.value == "yes"
+    assert changed == ["weapon:polarity"]
+
+
+def test_weapon_disagreement_between_reports_is_a_contradiction() -> None:
+    armed = ticket("D1", facts=facts(weapon="yes"))
+    unarmed = ticket("D2", facts=facts(weapon="no"))
+    contradictions, _ = r.compare_group([armed, unarmed])
+    assert "Weapon" in {c.topic for c in contradictions}

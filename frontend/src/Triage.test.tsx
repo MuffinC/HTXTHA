@@ -23,7 +23,7 @@ function putCalls(fetchMock: ReturnType<typeof mockApi>) {
 }
 
 describe('triage', () => {
-  it('shows the suggested priority, its rule and model factors with page chips', async () => {
+  it('shows a weapon as P1 from the rule floor, with its page chip', async () => {
     const t5 = byName('t5_weapon_variant.pdf');
     mockApi({ jobs: { [jobIncident.job_id]: jobIncident } });
     setUrl({ job: jobIncident.job_id, tab: t5.document_id });
@@ -31,11 +31,33 @@ describe('triage', () => {
 
     const panel = await triagePanel();
     expect(within(panel).getByTitle(/Ongoing danger to life/)).toHaveTextContent('SuggestedP1Urgent');
-    expect(panel).toHaveTextContent('rule floor P3 · raised by the model to P1');
+    expect(panel).toHaveTextContent('rule floor P1');
+    expect(panel).not.toHaveTextContent('raised by the model');
     expect(panel).toHaveTextContent('needs analyst review');
-    expect(within(panel).getByText('Rule-based')).toBeInTheDocument();
-    expect(within(panel).getByText('AI, quote checked')).toBeInTheDocument();
-    expect(within(panel).getAllByRole('button', { name: /^Open page 1/ }).length).toBeGreaterThan(0);
+    const factor = within(panel).getByText('Weapon reported').closest('li')!;
+    expect(within(factor).getByText('Rule-based')).toBeInTheDocument();
+    expect(within(factor).getByRole('button', { name: /^Open page 1/ })).toBeInTheDocument();
+  });
+
+  it('labels a model raise as AI with its checked quote', async () => {
+    const job = structuredClone(jobIncident);
+    const t4 = job.documents.find((d) => d.filename === 't4_unrelated_tree.pdf')!;
+    const triage = t4.analysis!.triage!;
+    triage.model_priority = 'P1';
+    triage.suggested_priority = 'P1';
+    triage.triggering_factors.push({
+      factor: 'Danger to life (“hit a roadside tree”)',
+      citation: { document_id: t4.document_id, page: 1 },
+      source: 'model',
+    });
+    mockApi({ jobs: { [job.job_id]: job } });
+    setUrl({ job: job.job_id, tab: t4.document_id });
+    render(<App />);
+
+    const panel = await triagePanel();
+    expect(panel).toHaveTextContent('rule floor P3 · raised by the model to P1');
+    const factor = within(panel).getByText(/hit a roadside tree/).closest('li')!;
+    expect(within(factor).getByText('AI, quote checked')).toBeInTheDocument();
   });
 
   it('shows the analyst decision next to the suggestion', async () => {

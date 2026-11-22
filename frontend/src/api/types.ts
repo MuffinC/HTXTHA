@@ -126,6 +126,8 @@ export interface IncidentFacts {
   lighting: Stated<Lighting>;
   injuries: Stated<'none' | 'injury' | 'serious_or_fatal'>;
   party_left_scene: Stated<'yes' | 'no'>;
+  /** Rubric P1 condition; negation is checked by code after grounding. */
+  weapon: Stated<'yes' | 'no'>;
   vehicle_types: VehicleType[];
   damage_locations: DamageLocation[];
 }
