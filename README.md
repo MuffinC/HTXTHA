@@ -143,7 +143,7 @@ Open http://localhost:8080 <!-- TODO: confirm port -->
 | Processing states |https://github.com/user-attachments/assets/07d302e3-db88-436e-924d-82de35744de5|
 | Per-document key details + Visual evidence analysis| <img width="1000" height="804" alt="key-details" src="https://github.com/user-attachments/assets/5fffb1e9-6a77-43cb-92df-317bfc712842" />
 <img width="760" height="646" alt="key-details" src="https://github.com/user-attachments/assets/124400f5-7997-436e-ba5f-7cf83d18944b" />|
-| Consolidated report (contradictions, timeline) | ![Consolidated](docs/images/consolidated.png) |
+| Consolidated report (contradictions, timeline) |<img width="1008" height="756" alt="image" src="https://github.com/user-attachments/assets/248403eb-e3c0-4493-9aba-02f54ae63b51" />|
 | Triage and analyst override |<img width="1000" height="804" alt="triage-override" src="https://github.com/user-attachments/assets/23788e7b-8e08-4810-8223-3b9f17fd7226" />|
 | Error handling (rejected and adversarial files) | <img width="1000" height="804" alt="error-handling" src="https://github.com/user-attachments/assets/ee120bbe-67be-414a-b374-12099362d0de" />|
 
@@ -151,7 +151,7 @@ Open http://localhost:8080 <!-- TODO: confirm port -->
 
 ## 5. Sample documents
 
-All samples are in [`sample_pdfs/`](sample_pdfs/). See [`sample_pdfs/README.md`](sample_pdfs/README.md) for sources and licences.
+All samples are in sample_pdfs. See [`sample_pdfs/README.md`](sample_pdfs/README.md) for sources and licences.
 
 | File | Type | Purpose |
 |---|---|---|
@@ -185,11 +185,10 @@ All samples are in [`sample_pdfs/`](sample_pdfs/). See [`sample_pdfs/README.md`]
 ## 8. Optional AI feature: Triage
 
 ### Purpose
-<!-- TODO -->
-
+To set a severity meter so that the more alarming matters come to light quicker as more urgency is required and needs more human intervention as soon as possible
 ### Design considerations
 <!-- TODO: explicit rubric, citations for every factor, suggestion-only, analyst override, feedback capture and agreement rate -->
-
+This requires more knowledge on what police or analyst define as more severe as i based it on what i know as the baseline. Alot more improvements can be made here after receiving user feedback
 ---
 
 ## 9. Assumptions
@@ -215,9 +214,6 @@ All samples are in [`sample_pdfs/`](sample_pdfs/). See [`sample_pdfs/README.md`]
 ## 11. Use of AI-assisted tools
 
 <!-- TODO: brief, honest note on how AI tools were used (e.g. planning with Claude, implementation with Claude Code) and how you reviewed and verified the output. -->
-
+Planning was done with Claude bouncing alot of ideas and finally execution was also done by claude code.
 ---
 
-## 12. Future work
-
-<!-- TODO: e.g. authentication and audit trail, evaluation harness using collected feedback, larger models on GPU, entity linking across documents, export to PDF -->
