@@ -1,5 +1,3 @@
-
-https://github.com/user-attachments/assets/2cdf83fb-4091-4e73-ac4d-ecca619c6e85
 # HTX Document Analyst
 
 <!-- TODO: replace with your CI badge once the workflow exists -->
@@ -16,7 +14,7 @@ https://github.com/user-attachments/assets/792b719c-f43f-4b96-a751-06e53b10fb31
 
 https://github.com/user-attachments/assets/ef2c2da5-0e83-48b9-9dcc-054648429ecf
 
-
+https://github.com/user-attachments/assets/2cdf83fb-4091-4e73-ac4d-ecca619c6e85
 ## Contents
 
 1. [Solution overview](#1-solution-overview)
@@ -80,12 +78,12 @@ flowchart LR
 
 ### Processing pipeline
 <!-- TODO: describe each stage briefly. Consider a second Mermaid diagram for the pipeline. -->
-1. **Validation**:
-2. **Extraction (per page)**:
-3. **Visual analysis**:
-4. **Document analysis**:
-5. **Consolidated report**:
-6. **Triage**:
+1. **Validation**: Validate if the document is ready, checking for formatting issues, safe(no malicious injected prompts in the document to mess up the ai)
+2. **Extraction (per page)**: pull out text +table information with no ai, then deciding which pages require the vision model to work on i.e(photo, scanned charts and images)
+3. **Visual analysis**: render the previously flagged out in extraction phase, get the local model to describe them and output into a structured json format. if it fails, it will just be a warning
+4. **Document analysis**: combining both phases 2 and 3 information and running through a model to get outputs like summaries, topics, entities, notable points with page citations
+5. **Consolidated report**: compare all the documented results to start forming a link between the given documents and also highlight contradictions + timeline of the incident.
+6. **Triage**:(optional feature) this is just an idea, to give a severity rating for the ticket/report and if it appears more severe than what the ai perceives it to be, can always override the ai and give a higher rating
 
 ### Key design decisions
 <!-- TODO: fill from docs/DECISIONS.md. Graders care about the "Why" column most. -->
