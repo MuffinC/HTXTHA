@@ -142,8 +142,7 @@ Open http://localhost:8080 <!-- TODO: confirm port -->
 | Upload with profile selection |https://github.com/user-attachments/assets/74d32155-c480-4225-b318-0267ad1d9312|
 | Processing states |https://github.com/user-attachments/assets/07d302e3-db88-436e-924d-82de35744de5|
 | Per-document key details + Visual evidence analysis| <img width="1000" height="804" alt="key-details" src="https://github.com/user-attachments/assets/5fffb1e9-6a77-43cb-92df-317bfc712842" />
-<img width="760" height="646" alt="key-details" src="https://github.com/user-attachments/assets/124400f5-7997-436e-ba5f-7cf83d18944b" />
-|
+<img width="760" height="646" alt="key-details" src="https://github.com/user-attachments/assets/124400f5-7997-436e-ba5f-7cf83d18944b" />|
 | Consolidated report (contradictions, timeline) | ![Consolidated](docs/images/consolidated.png) |
 | Triage and analyst override |<img width="1000" height="804" alt="triage-override" src="https://github.com/user-attachments/assets/23788e7b-8e08-4810-8223-3b9f17fd7226" />|
 | Error handling (rejected and adversarial files) | <img width="1000" height="804" alt="error-handling" src="https://github.com/user-attachments/assets/ee120bbe-67be-414a-b374-12099362d0de" />|
