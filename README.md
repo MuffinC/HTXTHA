@@ -1,12 +1,21 @@
+
+https://github.com/user-attachments/assets/2cdf83fb-4091-4e73-ac4d-ecca619c6e85
 # HTX Document Analyst
 
 <!-- TODO: replace with your CI badge once the workflow exists -->
-![CI](https://github.com/MuffinC/HTXTHA/actions/workflows/ci.yml/badge.svg)
+<img width="1274" height="857" alt="ci-pipeline" src="https://github.com/user-attachments/assets/059ba4ad-6055-4e81-b05b-00fb3a91f862" />
+
 
 <!-- TODO: one-sentence pitch. Example: "A fully local web app that helps Home Team analysts understand multiple incident reports at once: per-document key details, visual evidence analysis, and a consolidated cross-document report." -->
+Fully local web application built to help Home Team investigators with multiple ticket/report analysis with included triage function to determine severity and importance of the document.
 
 <!-- TODO: hero GIF of the full flow (upload → progress → results) -->
-![Demo](docs/images/demo.gif)
+
+https://github.com/user-attachments/assets/792b719c-f43f-4b96-a751-06e53b10fb31
+
+
+https://github.com/user-attachments/assets/ef2c2da5-0e83-48b9-9dcc-054648429ecf
+
 
 ## Contents
 
@@ -29,25 +38,27 @@
 
 ### The problem
 <!-- TODO: describe the analyst scenario in your own words. Who is the user, what do they receive, what slows them down today? -->
+Is there a way to assist analysts in ticket and report handling understanndiong the current contect + increasing efficiency with the use of local ai due to the secrecy of information handled?
 
 ### What the app does
 <!-- TODO: short paragraph on the flow. Upload one or more PDFs → each is validated, extracted page by page, images analysed by a local vision model → per-document key details → consolidated report across documents. -->
+Wtih this web application we can upload multiple tickets/documents to be validated and extracted page by page + images are read by a local vision model to give a clear overall analysis of the document highlighting key details within the document to categorise what the report is about. 
 
 ### Analysis profiles
 | Profile | Best for | Adds to the core output |
 |---|---|---|
-| General | Any document (news, reports) | — |
+| General | Any document (news, reports) | summary of given report  |
 | Incident | Incident tickets / reports with photos | Claims, narrative-vs-photo consistency checks, parties by role, missing information |
 | Statistical | Statistics releases, data-heavy reports | Key figures, trends, reporting period |
 <!-- TODO: remove rows for profiles you didn't build -->
 
 ### Key design principles
 <!-- TODO: explain each in a sentence or two, in your words -->
-- **Fully local inference**:
-- **Analyst in the loop**:
-- **Verifiable output (page citations)**:
-- **Observation vs inference**:
-- **Document content treated as untrusted**:
+- **Fully local inference**: Using a local model to first infer as best as it can regarding the document. picking out key words that shows what kind of report/ticket this is
+- **Analyst in the loop**: I gave it an analyst persona as thats the target user I am catering for, as such the model should act as their proxy
+- **Verifiable output (page citations)**: Always have a paper trail to the claims made by ai so it does not hallucinate and give wrong information
+- **Observation vs inference**: Ai will firstly observe and based on the predefined context we give it we can improve its inferrence output so this is an area to be worked on in the future after receiving feedback
+- **Document content treated as untrusted**: When there are too many contradicting information we need to flag that the document is not exactly reliable or trustworthy and requires a higher level of help, like a human in the loop to supervise.
 
 ---
 
