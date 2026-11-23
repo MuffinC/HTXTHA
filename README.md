@@ -89,12 +89,12 @@ flowchart LR
 <!-- TODO: fill from docs/DECISIONS.md. Graders care about the "Why" column most. -->
 | Decision | Alternatives considered | Why |
 |---|---|---|
-| Local model via Ollama | Cloud APIs (Gemini free tier, OpenAI) | |
-| Render whole page for visual analysis | Extract embedded images only | |
-| Single vision-language model for text and images | Separate OCR + text model | |
-| Async job queue with polling | Synchronous request | |
-| Structured JSON output validated by Pydantic | Free-text output | |
-| SQLite | Postgres / in-memory | |
+| Local model via Ollama | Cloud APIs (Gemini free tier, OpenAI) | I use local models via ollama because of the confidential nature of the reports and tickets|
+| Render whole page for visual analysis | Extract embedded images only |Only using extracted embedded images only saves compute and cuts the overall time takend to process a singular document by a large %|
+| Single vision-language model for text and images | Separate OCR + text model |Use a single vision language model for text and images, having all in one model is better on a resource tight budget|
+| Async job queue with polling | Synchronous request |Use async queue with polling. so that the resource isnt stretched too thin, additionally ollama is better suited for single user kind of work|
+| Structured JSON output validated by Pydantic | Free-text output |Having it as a structured json output allows us to record down the json in a controlled manner and it makes readibility and work downstream much easier|
+| SQLite | Postgres / in-memory |SQLite |
 
 ---
 
