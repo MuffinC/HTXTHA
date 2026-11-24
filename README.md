@@ -211,12 +211,15 @@ https://github.com/user-attachments/assets/74d32155-c480-4225-b318-0267ad1d9312
 https://github.com/user-attachments/assets/07d302e3-db88-436e-924d-82de35744de5
 
 ### Per-document key details and visual evidence (Incident profile)
-<!-- CHECK: use a screenshot of an Incident-profile document view here, e.g. T4 (triage panel, ticket card, reported facts with the two "Inconsistent" badges, scene grid). Confirm what the image below shows. -->
+<img width="1574" height="1003" alt="image" src="https://github.com/user-attachments/assets/7a4f2411-9eb0-4da1-8a3e-ba1c51f9ab62" />
+<img width="1159" height="779" alt="image" src="https://github.com/user-attachments/assets/33f06e15-4125-4323-8983-876c34110285" />
+<img width="1135" height="952" alt="image" src="https://github.com/user-attachments/assets/42a027a3-b7aa-4c5e-8e25-b40b68bd9dcb" />
+<img width="1133" height="599" alt="image" src="https://github.com/user-attachments/assets/2198f650-dd40-451f-acde-d5ff318cd857" />
 <img width="760" alt="Document view: key details and visual evidence" src="https://github.com/user-attachments/assets/124400f5-7997-436e-ba5f-7cf83d18944b" />
 
 ### Consolidated report (Incident profile)
-<!-- CHECK: this should show the Incident profile: "Same incident" group, rule-based contradictions table, group priority. -->
-<img width="1000" alt="Consolidated report" src="https://github.com/user-attachments/assets/248403eb-e3c0-4493-9aba-02f54ae63b51" />
+<img width="1730" height="1274" alt="image" src="https://github.com/user-attachments/assets/286b02c0-21c2-418a-8962-bb86b7b90c16" />
+<img width="1153" height="1040" alt="image" src="https://github.com/user-attachments/assets/7c9cbd95-0617-439f-9931-103d271fa4e3" />
 
 ### Why the Incident profile compares by rule
 The same five tickets under the General profile, where the model writes the consolidated report itself. It wrongly treats D2 as a different incident and dates it 15 March ("last night" in a report submitted on 15 March means the 14th). Under the Incident profile, the rules group and date them correctly.
