@@ -426,9 +426,7 @@ The full list, with IDs, is in [`docs/ASSUMPTIONS.md`](docs/ASSUMPTIONS.md). The
 ---
 
 ## 11. Use of AI-assisted tools
-
-<!-- CHECK: edit this into your own words -->
-I planned the solution with Claude: the problem framing, the architecture, the output schemas and each milestone's scope. The implementation was done by Claude Code against a written specification (`CLAUDE.md`), one milestone at a time. After each milestone I reviewed the summary and the design decisions, ran the tests and the app myself, and reviewed the screenshots. My review led to changes such as removing confusing UI labels, simplifying the triage design, and time-boxing prompt tuning in favour of rules in code. Every design decision and assumption is recorded in `docs/DECISIONS.md` and `docs/ASSUMPTIONS.md`.
+I did all the planning and cleaning up with claude having long back to and forth conversations regarding design and architecture choices. Additonally, ensuring that each step is properly checked, we split it into different milestones so that error handling can be alot smoother. Implementation was handled by Claude code using the claude.md file we created for each of the milestones which i review heavily on the summary after it is done generating the code. I also ran the programs to ensure everything was running smoothly to ensure that in no milestone was it hallucinating the job was properly executed. Every design decision and assumption is recorded in `docs/DECISIONS.md` and `docs/ASSUMPTIONS.md`.
 
 ---
 
