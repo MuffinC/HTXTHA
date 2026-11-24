@@ -13,10 +13,6 @@ https://github.com/user-attachments/assets/792b719c-f43f-4b96-a751-06e53b10fb31
 
 https://github.com/user-attachments/assets/ef2c2da5-0e83-48b9-9dcc-054648429ecf
 
-*…*
-
-https://github.com/user-attachments/assets/2cdf83fb-4091-4e73-ac4d-ecca619c6e85
-
 ## Contents
 
 1. [Solution overview](#1-solution-overview)
