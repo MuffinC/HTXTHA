@@ -4,12 +4,11 @@
 
 A fully local web application that helps Home Team analysts work through several incident tickets and reports at once: key details for each document, checks of each reporter's account against their own photos, a consolidated report across documents, and a suggested severity (triage) that the analyst confirms or overrides.
 
-Demo: 
+**Demo**
 
 https://github.com/user-attachments/assets/792b719c-f43f-4b96-a751-06e53b10fb31
 
 https://github.com/user-attachments/assets/ef2c2da5-0e83-48b9-9dcc-054648429ecf
-
 
 <img width="1000" height="804" alt="key-details" src="https://github.com/user-attachments/assets/47a7fe46-4c7d-4191-ab55-92017ea9610d" />
 
@@ -99,7 +98,7 @@ flowchart LR
 ### Prerequisites
 - **Docker Desktop** (on Windows, with the WSL 2 backend).
 - **About 8 GB of free disk space** for the model (about 3.3 GB) and the images.
-- **For the real model: an NVIDIA GPU with 8 GB of VRAM or more** (the model uses about 4.4 GB). Without a GPU the app still runs, but very slowly; mock mode needs no GPU at all.
+- **For the real model: an NVIDIA GPU with 8 GB of VRAM or more** (the model uses about 4.4 GB). Without a GPU the app still runs, but very slowly; mock mode needs no GPU at all. On Linux, Docker also needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) to use the GPU.
 - **Memory for Docker:** for the GPU stack, give Docker's virtual machine at least 10 GB. On Windows, create `%UserProfile%\.wslconfig` containing:
   ```
   [wsl2]
@@ -146,7 +145,7 @@ On Linux or macOS, use `./scripts/setup_backend.sh`. With Anaconda: `conda env c
 
 To use a natively installed Ollama instead of mock mode, set `LLM_PROVIDER=ollama` and `OLLAMA_BASE_URL=http://127.0.0.1:11434`. On an 8 GB GPU, also set `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0` as environment variables for Ollama itself, then restart it. Use `127.0.0.1` rather than `localhost`, which can resolve to IPv6.
 
-**Frontend** (Node 24):
+**Frontend** (Node 24), in a second terminal from the repo root:
 ```bash
 cd frontend
 npm ci
@@ -155,19 +154,23 @@ npm run dev
 Open http://127.0.0.1:5173. The dev server forwards `/api` to the backend on port 8000.
 
 ### Running tests
+Run each block from the repo root.
+
 ```bash
-# Backend: unit tests, mock provider only
+# Backend (with the backend environment active)
 cd backend
-pytest
-# Live tests against the real model (needs Ollama running)
-pytest -m ollama
+pytest              # unit tests, mock provider only
+pytest -m ollama    # live tests against the real model (needs Ollama running)
+cd ..
 
 # Frontend
 cd frontend
+npm ci
 npm run lint
 npm run typecheck
 npm test
 npm run build
+cd ..
 
 # Smoke test against a running stack (Git Bash or Linux)
 bash scripts/smoke_test.sh http://127.0.0.1:8080 120
@@ -207,15 +210,15 @@ https://github.com/user-attachments/assets/74d32155-c480-4225-b318-0267ad1d9312
 https://github.com/user-attachments/assets/07d302e3-db88-436e-924d-82de35744de5
 
 ### Per-document key details and visual evidence (Incident profile)
-<img width="1574" height="1003" alt="image" src="https://github.com/user-attachments/assets/7a4f2411-9eb0-4da1-8a3e-ba1c51f9ab62" />
-<img width="1159" height="779" alt="image" src="https://github.com/user-attachments/assets/33f06e15-4125-4323-8983-876c34110285" />
-<img width="1135" height="952" alt="image" src="https://github.com/user-attachments/assets/42a027a3-b7aa-4c5e-8e25-b40b68bd9dcb" />
-<img width="1133" height="599" alt="image" src="https://github.com/user-attachments/assets/2198f650-dd40-451f-acde-d5ff318cd857" />
+<img width="1574" height="1003" alt="Document view: triage, ticket and reported facts" src="https://github.com/user-attachments/assets/7a4f2411-9eb0-4da1-8a3e-ba1c51f9ab62" />
+<img width="1159" height="779" alt="Document view: key details" src="https://github.com/user-attachments/assets/33f06e15-4125-4323-8983-876c34110285" />
+<img width="1135" height="952" alt="Document view: key details" src="https://github.com/user-attachments/assets/42a027a3-b7aa-4c5e-8e25-b40b68bd9dcb" />
+<img width="1133" height="599" alt="Document view: visual evidence" src="https://github.com/user-attachments/assets/2198f650-dd40-451f-acde-d5ff318cd857" />
 <img width="760" alt="Document view: key details and visual evidence" src="https://github.com/user-attachments/assets/124400f5-7997-436e-ba5f-7cf83d18944b" />
 
 ### Consolidated report (Incident profile)
-<img width="1730" height="1274" alt="image" src="https://github.com/user-attachments/assets/286b02c0-21c2-418a-8962-bb86b7b90c16" />
-<img width="1153" height="1040" alt="image" src="https://github.com/user-attachments/assets/7c9cbd95-0617-439f-9931-103d271fa4e3" />
+<img width="1730" height="1274" alt="Consolidated report: same-incident group and contradictions" src="https://github.com/user-attachments/assets/286b02c0-21c2-418a-8962-bb86b7b90c16" />
+<img width="1153" height="1040" alt="Consolidated report: contradictions and timeline" src="https://github.com/user-attachments/assets/7c9cbd95-0617-439f-9931-103d271fa4e3" />
 
 ### Why the Incident profile compares by rule
 The same five tickets under the General profile, where the model writes the consolidated report itself. It wrongly treats D2 as a different incident and dates it 15 March ("last night" in a report submitted on 15 March means the 14th). Under the Incident profile, the rules group and date them correctly.
@@ -253,9 +256,7 @@ All samples are in [`sample_pdfs/`](sample_pdfs/). Sources, licences and the exp
 | `tickets/t3_passenger.pdf` | Synthetic ticket | Same incident, passenger; doesn't mention the traffic light (tests that absence is never a contradiction) |
 | `tickets/t4_unrelated_tree.pdf` | Synthetic ticket | Unrelated incident whose narrative (night, heavy rain) contradicts its own photo (daylight, dry road) |
 | `tickets/t5_weapon_variant.pdf` | Synthetic ticket | Separate incident involving a knife (tests the P1 triage rule) |
-| `general/` <!-- CHECK: filename --> | Public document | NHTSA research note, crash statistics with trend charts (US public domain) |
-| `general/` <!-- CHECK: filename --> | Public document | NHTSA research note, previous year (US public domain) |
-| `general/` <!-- CHECK: filename --> | Public document | NTSB Highway Accident Brief with crash photos and diagrams (US public domain) |
+| `general/` (3 files) | Public documents | Two NHTSA research notes on US crash statistics (consecutive years, with trend charts) and an NTSB Highway Accident Brief with crash photos and diagrams. US federal government works, public domain. |
 | `adversarial/prompt_injection.pdf` | Adversarial | Visible and hidden (white-on-white) instructions to the AI: accepted, flagged |
 | `adversarial/vector_chart.pdf` | Test file | A chart drawn with vectors and no embedded images |
 | `adversarial/fake_pdf.pdf` | Adversarial | A text file renamed to `.pdf`: rejected |
@@ -425,7 +426,7 @@ The full list, with IDs, is in [`docs/ASSUMPTIONS.md`](docs/ASSUMPTIONS.md). The
 ---
 
 ## 11. Use of AI-assisted tools
-I did all the planning and cleaning up with claude having long back to and forth conversations regarding design and architecture choices. Additonally, ensuring that each step is properly checked, we split it into different milestones so that error handling can be alot smoother. Implementation was handled by Claude code using the claude.md file we created for each of the milestones which i review heavily on the summary after it is done generating the code. I also ran the programs to ensure everything was running smoothly to ensure that in no milestone was it hallucinating the job was properly executed. Every design decision and assumption is recorded in `docs/DECISIONS.md` and `docs/ASSUMPTIONS.md`.
+I did all the planning and cleaning up with Claude, having long back-and-forth conversations regarding design and architecture choices. Additionally, to ensure that each step is properly checked, we split it into different milestones so that error handling can be a lot smoother. Implementation was handled by Claude Code using the CLAUDE.md file we created for each of the milestones, which I reviewed heavily through the summary after it was done generating the code. I also ran the programs to ensure everything was running smoothly, and that in no milestone was it hallucinating and the job was properly executed. Every design decision and assumption is recorded in `docs/DECISIONS.md` and `docs/ASSUMPTIONS.md`.
 
 ---
 
