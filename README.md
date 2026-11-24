@@ -5,15 +5,12 @@
 A fully local web application that helps Home Team analysts work through several incident tickets and reports at once: key details for each document, checks of each reporter's account against their own photos, a consolidated report across documents, and a suggested severity (triage) that the analyst confirms or overrides.
 
 <!-- CHECK: give each video a one-line caption saying what it shows -->
-*Walkthrough: …*
+*Demo: *
 
 https://github.com/user-attachments/assets/792b719c-f43f-4b96-a751-06e53b10fb31
 
-*…*
-
 https://github.com/user-attachments/assets/ef2c2da5-0e83-48b9-9dcc-054648429ecf
 
-*…*
 
 <img width="1000" height="804" alt="key-details" src="https://github.com/user-attachments/assets/47a7fe46-4c7d-4191-ab55-92017ea9610d" />
 
